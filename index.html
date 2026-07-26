@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Umleitung Pilot</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#101114;          /* asphalt night */
+    --panel:#1a1c21;
+    --line:#2a2d34;
+    --sign:#f7c600;        /* German Umleitung sign yellow */
+    --sign-ink:#141414;    /* sign black */
+    --text:#f2f3f5;
+    --muted:#9aa0ab;
+    --ok:#3ecf72;
+    --warn:#ff5a48;
+    --route:#f7c600;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'Archivo',system-ui,sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* ── Header ── */
+  header{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px;border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  .logo{
+    background:var(--sign);color:var(--sign-ink);
+    font-weight:900;font-stretch:80%;letter-spacing:.02em;
+    padding:4px 10px;border-radius:4px;border:2px solid var(--sign-ink);
+    box-shadow:0 0 0 2px var(--sign);
+    font-size:15px;text-transform:uppercase;
+  }
+  header .sub{font-size:12px;color:var(--muted)}
+  header .spacer{flex:1}
+  .lang-toggle{
+    display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  }
+  .lang-toggle button{
+    background:transparent;color:var(--muted);border:0;
+    padding:7px 12px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;
+  }
+  .lang-toggle button.active{background:var(--sign);color:var(--sign-ink)}
+
+  /* ── Map ── */
+  #map{flex:1;min-height:0;background:#0c0d10}
+  .leaflet-container{font-family:inherit}
+
+  /* ── Instruction HUD (the sign) ── */
+  #hud{
+    display:none;position:absolute;top:64px;left:10px;right:10px;z-index:1000;
+    background:var(--sign);color:var(--sign-ink);
+    border:3px solid var(--sign-ink);border-radius:10px;
+    box-shadow:0 6px 24px rgba(0,0,0,.55), inset 0 0 0 3px var(--sign);
+    padding:12px 16px;display:none;align-items:center;gap:16px;
+  }
+  #hud.on{display:flex}
+  #hud .arrow{font-size:52px;line-height:1;font-weight:900;min-width:60px;text-align:center}
+  #hud .dist{font-size:40px;font-weight:900;font-stretch:80%;letter-spacing:-.01em}
+  #hud .what{font-size:16px;font-weight:700;margin-top:2px}
+  #hud .then{font-size:12px;font-weight:600;opacity:.75;margin-top:4px}
+
+  /* ── Status bar ── */
+  #statusbar{
+    display:none;position:absolute;bottom:96px;left:10px;z-index:1000;
+    background:rgba(16,17,20,.85);backdrop-filter:blur(6px);
+    border:1px solid var(--line);border-radius:10px;
+    padding:8px 14px;font-size:13px;color:var(--muted);
+  }
+  #statusbar b{color:var(--text);font-size:18px}
+  #statusbar.offroute{border-color:var(--warn);color:var(--warn)}
+
+  /* ── Bottom controls ── */
+  #controls{
+    flex-shrink:0;display:flex;gap:10px;padding:12px 14px;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);background:var(--panel);
+  }
+  .btn{
+    flex:1;border:0;border-radius:12px;padding:16px 10px;
+    font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn-load{background:#22252c;color:var(--text);border:1px solid var(--line)}
+  .btn-go{background:var(--sign);color:var(--sign-ink)}
+  .btn-go:disabled{opacity:.35;cursor:default}
+  .btn-stop{background:var(--warn);color:#fff}
+  .btn-sim{flex:0 0 auto;background:#22252c;color:var(--muted);border:1px solid var(--line);font-size:13px;padding:16px 14px}
+  .hidden{display:none!important}
+
+  /* ── Empty state ── */
+  #empty{
+    position:absolute;inset:0;z-index:900;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;text-align:center;
+    background:linear-gradient(180deg, rgba(16,17,20,.6), rgba(16,17,20,.92));
+    padding:30px;pointer-events:none;
+  }
+  #empty .sign-demo{
+    background:var(--sign);color:var(--sign-ink);border:3px solid var(--sign-ink);
+    box-shadow:inset 0 0 0 3px var(--sign);border-radius:8px;
+    font-weight:900;font-size:22px;padding:10px 22px;transform:rotate(-2deg);
+  }
+  #empty p{color:var(--muted);font-size:14px;max-width:300px;line-height:1.5}
+  #toast{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1200;
+    background:#22252c;border:1px solid var(--line);color:var(--text);
+    padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;
+    opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;
+  }
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Umleitung</div>
+  <div>
+    <div style="font-weight:800;font-size:14px">Pilot</div>
+    <div class="sub" id="routeName">Rota yüklenmedi</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="lang-toggle" title="Sesli yönlendirme dili">
+    <button id="langTR" class="active">TR</button>
+    <button id="langDE">DE</button>
+  </div>
+</header>
+
+<div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+  <div id="map"></div>
+
+  <div id="empty">
+    <div class="sign-demo">Umleitung &#10141;</div>
+    <p><b>KML</b> veya <b>GPX</b> dosyanı yükle.<br>Rota haritada çizilsin, "Başlat"a bas,<br>gerisini ben söylerim: <i>"100 metre sonra sağa dön."</i></p>
+  </div>
+
+  <div id="hud">
+    <div class="arrow" id="hudArrow">&#8593;</div>
+    <div>
+      <div class="dist" id="hudDist">–</div>
+      <div class="what" id="hudWhat">–</div>
+      <div class="then" id="hudThen"></div>
+    </div>
+  </div>
+
+  <div id="statusbar"><b id="sbSpeed">0</b> km/h &nbsp;·&nbsp; <span id="sbLeft">–</span> kaldı</div>
+  <div id="toast"></div>
+
+  <div id="pasteModal" style="display:none;position:absolute;inset:0;z-index:1500;background:rgba(16,17,20,.92);padding:20px;flex-direction:column;gap:12px">
+    <div style="font-weight:800;font-size:16px">KML / GPX içeriğini yapıştır</div>
+    <textarea id="pasteArea" placeholder="&lt;?xml version=&quot;1.0&quot;...&gt; ile başlayan dosya içeriğini buraya yapıştır" style="flex:1;background:#1a1c21;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-family:monospace;font-size:12px;resize:none"></textarea>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-load" id="pasteCancel">Vazgeç</button>
+      <button class="btn btn-go" id="pasteOk">Rotayı Çiz</button>
+    </div>
+  </div>
+</div>
+
+<div id="controls">
+  <input type="file" id="fileInput" accept=".kml,.gpx,application/vnd.google-earth.kml+xml" class="hidden">
+  <button class="btn btn-load" id="btnLoad">&#128194; Dosya Yükle</button>
+  <button class="btn btn-load" id="btnPaste" style="flex:0 0 auto;font-size:13px;padding:16px 14px" title="KML/GPX içeriğini metin olarak yapıştır">&#128203;</button>
+  <button class="btn btn-go" id="btnGo" disabled>&#9654; Başlat</button>
+  <button class="btn btn-sim hidden" id="btnSim" title="Test: rotayı sanal olarak sürer, GPS gerekmez">SİM<br><span style="font-size:10px;font-weight:600">test</span></button>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════ State ═══════════ */
+let map, routeLayer, posMarker, turnMarkers = [];
+let baseRoute = null;    // loaded KML/GPX route
+let route = null;        // active route (may include approach leg to the start)
+let navActive = false, watchId = null, simTimer = null, wakeLock = null;
+let voiceLang = 'tr';
+let nextTurnIdx = 0;
+let announced = {};      // turnIdx -> Set of thresholds spoken
+let arrivalSpoken = false;
+let onMainSpoken = true;
+let lastOnRouteS = 0;
+
+const $ = id => document.getElementById(id);
+
+/* ═══════════ Map init ═══════════ */
+map = L.map('map', { zoomControl: false }).setView([52.35, 9.73], 12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+/* ═══════════ Geometry helpers ═══════════ */
+const R = 6371000;
+const toRad = d => d * Math.PI / 180;
+const toDeg = r => r * 180 / Math.PI;
+
+function haversine(a, b) {
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+function bearing(a, b) {
+  const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
+  const x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) -
+            Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lng - a.lng));
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+function angleDiff(b1, b2) { // signed -180..180, + = right
+  let d = b2 - b1;
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  return d;
+}
+// project point p onto route, return {s: distance along route, d: distance from route}
+function projectOnRoute(p) {
+  let best = { s: 0, d: Infinity };
+  for (let i = 0; i < route.pts.length - 1; i++) {
+    const a = route.pts[i], b = route.pts[i+1];
+    // local flat approximation
+    const kx = Math.cos(toRad(a.lat)) * 111320, ky = 110540;
+    const ax = 0, ay = 0;
+    const bx = (b.lng - a.lng) * kx, by = (b.lat - a.lat) * ky;
+    const px = (p.lng - a.lng) * kx, py = (p.lat - a.lat) * ky;
+    const len2 = bx*bx + by*by;
+    let t = len2 ? ((px*bx + py*by) / len2) : 0;
+    t = Math.max(0, Math.min(1, t));
+    const dx = px - t*bx, dy = py - t*by;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < best.d) {
+      best.d = d;
+      best.s = route.cum[i] + t * (route.cum[i+1] - route.cum[i]);
+    }
+  }
+  return best;
+}
+
+/* ═══════════ File parsing ═══════════ */
+function parseFile(name, text) {
+  const dom = new DOMParser().parseFromString(text, "application/xml");
+  if (dom.querySelector("parsererror")) throw new Error("Dosya okunamadı — geçerli bir KML/GPX değil.");
+  let pts = [], routeName = name.replace(/\.(kml|gpx)$/i, "");
+
+  if (name.toLowerCase().endsWith(".gpx") || dom.querySelector("gpx")) {
+    const nodes = dom.querySelectorAll("trkpt, rtept");
+    nodes.forEach(n => pts.push({ lat: +n.getAttribute("lat"), lng: +n.getAttribute("lon") }));
+    const nm = dom.querySelector("trk > name, rte > name, metadata > name");
+    if (nm) routeName = nm.textContent.trim();
+  } else {
+    // KML: collect all LineString coordinates (also inside MultiGeometry / gx:Track)
+    dom.querySelectorAll("LineString > coordinates").forEach(c => {
+      c.textContent.trim().split(/\s+/).forEach(trip => {
+        const [lng, lat] = trip.split(",").map(Number);
+        if (isFinite(lat) && isFinite(lng)) pts.push({ lat, lng });
+      });
+    });
+    if (!pts.length) { // gx:Track fallback
+      dom.querySelectorAll("coord").forEach(c => {
+        const [lng, lat] = c.textContent.trim().split(/\s+/).map(Number);
+        if (isFinite(lat) && isFinite(lng)) pts.push({ lat, lng });
+      });
+    }
+    const nm = dom.querySelector("Document > name, Placemark > name");
+    if (nm) routeName = nm.textContent.trim();
+  }
+
+  if (pts.length < 2) throw new Error("Dosyada çizgi (rota) bulunamadı. Sadece nokta içeren dosyalar navigasyon için yeterli değil.");
+
+  // simplify: drop points closer than 8 m to previous
+  const simp = [pts[0]];
+  for (const p of pts) {
+    if (haversine(simp[simp.length-1], p) >= 8) simp.push(p);
+  }
+  if (haversine(simp[simp.length-1], pts[pts.length-1]) > 1) simp.push(pts[pts.length-1]);
+  return { name: routeName, pts: simp };
+}
+
+/* ═══════════ Turn detection ═══════════ */
+function analyzeRoute(r) {
+  const pts = r.pts;
+  r.cum = [0];
+  for (let i = 1; i < pts.length; i++) r.cum[i] = r.cum[i-1] + haversine(pts[i-1], pts[i]);
+  r.total = r.cum[pts.length - 1];
+
+  const LOOK = 20; // meters of lookahead/lookback for bearing
+  function bearingBefore(i) {
+    let j = i;
+    while (j > 0 && r.cum[i] - r.cum[j] < LOOK) j--;
+    return bearing(pts[j], pts[i]);
+  }
+  function bearingAfter(i) {
+    let j = i;
+    while (j < pts.length - 1 && r.cum[j] - r.cum[i] < LOOK) j++;
+    return bearing(pts[i], pts[j]);
+  }
+
+  let turns = [];
+  for (let i = 2; i < pts.length - 2; i++) {
+    const d = angleDiff(bearingBefore(i), bearingAfter(i));
+    if (Math.abs(d) >= 35) turns.push({ idx: i, s: r.cum[i], dir: d > 0 ? "R" : "L", angle: Math.abs(d) });
+  }
+  // merge turns within 40 m of each other, keep sharpest
+  const merged = [];
+  for (const t of turns) {
+    const last = merged[merged.length - 1];
+    if (last && t.s - last.s < 40) { if (t.angle > last.angle) merged[merged.length-1] = t; }
+    else merged.push(t);
+  }
+  r.turns = merged;
+}
+
+/* ═══════════ Voice ═══════════ */
+const PHRASES = {
+  tr: {
+    far:  (m,d) => `${m} metre sonra ${d==="R"?"sağa":"sola"} dönün`,
+    now:  d => `Şimdi ${d==="R"?"sağa":"sola"} dönün`,
+    sharp: d => `keskin ${d==="R"?"sağ":"sol"}`,
+    start: "Navigasyon başladı. Rotayı takip edin.",
+    offroute: "Rotadan çıktınız",
+    back: "Rotaya döndünüz",
+    arrive: "Hedefe ulaştınız. Rota tamamlandı.",
+    straight: "Rotayı takip edin",
+    approach: "Önce Umleitung başlangıcına yönlendiriliyorsunuz",
+    onroute: "Umleitung rotasına girdiniz",
+    turnR: "Sağa dön", turnL: "Sola dön", then: "ardından"
+  },
+  de: {
+    far:  (m,d) => `In ${m} Metern ${d==="R"?"rechts":"links"} abbiegen`,
+    now:  d => `Jetzt ${d==="R"?"rechts":"links"} abbiegen`,
+    sharp: d => `scharf ${d==="R"?"rechts":"links"}`,
+    start: "Navigation gestartet. Folgen Sie der Route.",
+    offroute: "Sie haben die Route verlassen",
+    back: "Zurück auf der Route",
+    arrive: "Sie haben Ihr Ziel erreicht.",
+    straight: "Der Route folgen",
+    approach: "Sie werden zuerst zum Beginn der Umleitung geführt",
+    onroute: "Sie sind jetzt auf der Umleitungsroute",
+    turnR: "Rechts abbiegen", turnL: "Links abbiegen", then: "danach"
+  }
+};
+function speak(text) {
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = voiceLang === "tr" ? "tr-TR" : "de-DE";
+    u.rate = 1.0;
+    speechSynthesis.speak(u);
+  } catch (e) { console.warn("TTS yok:", e); }
+}
+
+/* ═══════════ UI helpers ═══════════ */
+function toast(msg, ms = 3500) {
+  $("toast").textContent = msg;
+  $("toast").classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => $("toast").classList.remove("show"), ms);
+}
+function fmtDist(m) {
+  if (m >= 1000) return (m/1000).toFixed(1).replace(".", ",") + " km";
+  return Math.round(m/10)*10 + " m";
+}
+const P = () => PHRASES[voiceLang];
+
+/* ═══════════ Route display ═══════════ */
+function displayRoute(r) {
+  if (routeLayer) map.removeLayer(routeLayer);
+  turnMarkers.forEach(m => map.removeLayer(m));
+  turnMarkers = [];
+
+  const latlngs = r.pts.map(p => [p.lat, p.lng]);
+  const ai = r.approachIdx || 0;
+  const layers = [];
+  if (ai > 0) {
+    layers.push(L.polyline(latlngs.slice(0, ai + 1), { color: "#2b7fff", weight: 5, opacity: .9, dashArray: "10 8" }));
+  }
+  const mainLatlngs = latlngs.slice(ai);
+  layers.push(L.polyline(mainLatlngs, { color: "#141414", weight: 9, opacity: .8 }));
+  layers.push(L.polyline(mainLatlngs, { color: "#f7c600", weight: 5, opacity: .95 }));
+  layers.push(L.circleMarker(mainLatlngs[0], { radius: 8, color: "#141414", fillColor: "#3ecf72", fillOpacity: 1, weight: 2 }).bindTooltip("Umleitung başlangıcı"));
+  layers.push(L.circleMarker(latlngs[latlngs.length-1], { radius: 8, color: "#141414", fillColor: "#ff5a48", fillOpacity: 1, weight: 2 }).bindTooltip("Hedef"));
+  routeLayer = L.layerGroup(layers).addTo(map);
+
+  r.turns.forEach(t => {
+    const m = L.circleMarker([r.pts[t.idx].lat, r.pts[t.idx].lng],
+      { radius: 5, color: "#141414", fillColor: "#fff", fillOpacity: 1, weight: 2 });
+    m.addTo(map); turnMarkers.push(m);
+  });
+
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+  $("routeName").textContent = `${r.name} · ${fmtDist(r.total)} · ${r.turns.length} dönüş`;
+  $("empty").classList.add("hidden");
+  $("btnGo").disabled = false;
+  $("btnSim").classList.remove("hidden");
+}
+
+/* ═══════════ Navigation core ═══════════ */
+function updateHUD(remaining, turn, nextTurn) {
+  const hud = $("hud");
+  hud.classList.add("on");
+  if (!turn) {
+    $("hudArrow").innerHTML = "&#127937;";
+    $("hudDist").textContent = fmtDist(remaining);
+    $("hudWhat").textContent = voiceLang === "tr" ? "Hedef" : "Ziel";
+    $("hudThen").textContent = "";
+    return;
+  }
+  $("hudArrow").innerHTML = turn.dir === "R" ? "&#10548;" : "&#10547;";
+  $("hudDist").textContent = fmtDist(remaining);
+  $("hudWhat").textContent = (turn.dir === "R" ? P().turnR : P().turnL) + (turn.angle > 110 ? " (" + P().sharp(turn.dir) + ")" : "");
+  if (nextTurn && nextTurn.s - turn.s < 250) {
+    $("hudThen").textContent = P().then + ": " + (nextTurn.dir === "R" ? P().turnR : P().turnL) + " (" + fmtDist(nextTurn.s - turn.s) + ")";
+  } else $("hudThen").textContent = "";
+}
+
+function onPosition(lat, lng, speedMs) {
+  if (!navActive || !route) return;
+
+  if (!posMarker) {
+    posMarker = L.circleMarker([lat, lng], { radius: 9, color: "#fff", fillColor: "#2b7fff", fillOpacity: 1, weight: 3 }).addTo(map);
+  } else posMarker.setLatLng([lat, lng]);
+  map.setView([lat, lng], map.getZoom(), { animate: false });
+
+  const proj = projectOnRoute({ lat, lng });
+  if (!onMainSpoken && proj.s >= (route.approachS || 0)) { onMainSpoken = true; speak(P().onroute); }
+  const sb = $("statusbar");
+  sb.style.display = "block";
+  $("sbSpeed").textContent = speedMs != null && isFinite(speedMs) ? Math.round(speedMs * 3.6) : "–";
+  $("sbLeft").textContent = fmtDist(Math.max(0, route.total - proj.s));
+
+  // Off-route check
+  if (proj.d > 60) {
+    if (!sb.classList.contains("offroute")) { sb.classList.add("offroute"); speak(P().offroute); }
+    return;
+  } else if (sb.classList.contains("offroute")) {
+    sb.classList.remove("offroute"); speak(P().back);
+  }
+  lastOnRouteS = proj.s;
+
+  // advance past completed turns
+  while (nextTurnIdx < route.turns.length && route.turns[nextTurnIdx].s < proj.s - 25) nextTurnIdx++;
+
+  const turn = route.turns[nextTurnIdx] || null;
+  const nextTurn = route.turns[nextTurnIdx + 1] || null;
+
+  if (!turn) {
+    const remToEnd = route.total - proj.s;
+    updateHUD(remToEnd, null, null);
+    if (remToEnd < 40 && !arrivalSpoken) { arrivalSpoken = true; speak(P().arrive); stopNav(true); }
+    return;
+  }
+
+  const rem = turn.s - proj.s;
+  updateHUD(rem, turn, nextTurn);
+
+  announced[nextTurnIdx] = announced[nextTurnIdx] || new Set();
+  const a = announced[nextTurnIdx];
+  if (rem <= 320 && rem > 220 && !a.has(300)) { a.add(300); speak(P().far(300, turn.dir)); }
+  else if (rem <= 120 && rem > 60 && !a.has(100)) { a.add(100); speak(P().far(100, turn.dir)); }
+  else if (rem <= 45 && !a.has(0)) { a.add(0); speak(P().now(turn.dir)); }
+}
+
+function getPositionOnce() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Bu cihazda/tarayıcıda konum servisi yok"));
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      err => reject(new Error(
+        err.code === 1 ? "Konum izni reddedildi. Tarayıcı ayarlarından izin ver." :
+        err.code === 2 ? "Konum belirlenemedi (GPS sinyali yok)." :
+        "Konum isteği zaman aşımına uğradı."
+      )),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+    );
+  });
+}
+
+async function fetchApproach(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Rota servisi cevap vermedi");
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) throw new Error("Başlangıca rota bulunamadı");
+  return data.routes[0].geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+}
+
+function buildCombined(approachPts, base) {
+  // simplify approach the same way as parsed routes
+  const simp = [approachPts[0]];
+  for (const p of approachPts) if (haversine(simp[simp.length-1], p) >= 8) simp.push(p);
+  const combined = { name: base.name, pts: simp.concat(base.pts) };
+  combined.approachIdx = simp.length;
+  analyzeRoute(combined);
+  combined.approachS = combined.cum[combined.approachIdx];
+  return combined;
+}
+
+async function startNav(simulate = false) {
+  if (!baseRoute) return;
+
+  if (!simulate) {
+    // 1) find where the driver is right now
+    let here;
+    $("btnGo").disabled = true;
+    toast("Konum alınıyor…");
+    try { here = await getPositionOnce(); }
+    catch (e) {
+      $("btnGo").disabled = false;
+      toast("Konum alınamadı: " + e.message + " (Not: Claude önizlemesinde konum kapalıdır — GitHub Pages'ten aç.)", 7000);
+      return;
+    }
+    $("btnGo").disabled = false;
+
+    // 2) if not at the route start, fetch an approach leg
+    const start = baseRoute.pts[0];
+    const distToStart = haversine(here, start);
+    route = baseRoute; route.approachIdx = 0; route.approachS = 0;
+    if (distToStart > 120) {
+      toast("Başlangıca giden yol hesaplanıyor…");
+      try {
+        const appr = await fetchApproach(here, start);
+        route = buildCombined(appr, baseRoute);
+        displayRoute(route);
+      } catch (e) {
+        toast("Başlangıç rotası alınamadı, doğrudan Umleitung gösteriliyor: " + e.message, 6000);
+      }
+    }
+  } else {
+    route = baseRoute; route.approachIdx = 0; route.approachS = 0;
+  }
+
+  navActive = true; nextTurnIdx = 0; announced = {}; arrivalSpoken = false; onMainSpoken = (route.approachS === 0);
+  $("btnGo").classList.add("hidden");
+  $("btnLoad").classList.add("hidden");
+  $("btnPaste").classList.add("hidden");
+  $("btnSim").classList.add("hidden");
+  $("btnStop").classList.remove("hidden");
+  map.setZoom(17);
+  speak(route.approachS > 0 ? P().approach : P().start);
+
+  try { wakeLock = await navigator.wakeLock?.request("screen"); } catch (e) {}
+
+  if (simulate) {
+    // virtual drive at ~45 km/h
+    let s = 0; const step = 12.5; // m per tick (1s)
+    simTimer = setInterval(() => {
+      s += step;
+      if (s >= route.total) s = route.total;
+      // find point at distance s
+      let i = 1; while (i < route.cum.length && route.cum[i] < s) i++;
+      const a = route.pts[i-1], b = route.pts[Math.min(i, route.pts.length-1)];
+      const seg = route.cum[Math.min(i, route.cum.length-1)] - route.cum[i-1] || 1;
+      const t = (s - route.cum[i-1]) / seg;
+      onPosition(a.lat + (b.lat-a.lat)*t, a.lng + (b.lng-a.lng)*t, 12.5);
+      if (s >= route.total) clearInterval(simTimer);
+    }, 1000);
+    toast("Simülasyon modu — sanal sürüş başladı");
+  } else {
+    if (!navigator.geolocation) { toast("Bu cihazda konum servisi yok"); stopNav(); return; }
+    watchId = navigator.geolocation.watchPosition(
+      p => onPosition(p.coords.latitude, p.coords.longitude, p.coords.speed),
+      err => toast("Konum alınamadı: " + err.message, 5000),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+    );
+  }
+}
+
+function stopNav(finished = false) {
+  navActive = false;
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (simTimer) { clearInterval(simTimer); simTimer = null; }
+  try { wakeLock?.release(); } catch (e) {}
+  wakeLock = null;
+  $("hud").classList.remove("on");
+  $("statusbar").style.display = "none";
+  $("btnStop").classList.add("hidden");
+  $("btnGo").classList.remove("hidden");
+  $("btnLoad").classList.remove("hidden");
+  $("btnPaste").classList.remove("hidden");
+  $("btnSim").classList.remove("hidden");
+  if (posMarker) { map.removeLayer(posMarker); posMarker = null; }
+  if (!finished) speechSynthesis.cancel();
+  if (baseRoute) { route = baseRoute; displayRoute(baseRoute); }
+}
+
+/* ═══════════ Wire up ═══════════ */
+$("btnLoad").onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadFromText(f.name, reader.result); }
+    catch (err) { toast("Hata: " + err.message, 5000); }
+  };
+  reader.readAsText(f);
+  e.target.value = "";
+};
+$("btnGo").onclick = () => startNav(false);
+$("btnSim").onclick = () => startNav(true);
+
+/* Paste fallback (works even where the file picker is blocked, e.g. sandboxed previews) */
+function loadFromText(name, text) {
+  const r = parseFile(name, text);
+  analyzeRoute(r);
+  r.approachIdx = 0; r.approachS = 0;
+  baseRoute = r;
+  route = r;
+  displayRoute(r);
+  toast(`Rota yüklendi: ${r.turns.length} dönüş noktası bulundu`);
+}
+$("btnPaste").onclick = () => { $("pasteModal").style.display = "flex"; $("pasteArea").focus(); };
+$("pasteCancel").onclick = () => { $("pasteModal").style.display = "none"; };
+$("pasteOk").onclick = () => {
+  const txt = $("pasteArea").value.trim();
+  if (!txt) { toast("Önce içeriği yapıştır"); return; }
+  try {
+    const guessName = txt.includes("<gpx") ? "rota.gpx" : "rota.kml";
+    loadFromText(guessName, txt);
+    $("pasteModal").style.display = "none";
+    $("pasteArea").value = "";
+  } catch (err) { toast("Hata: " + err.message, 5000); }
+};
+
+/* Drag & drop */
+document.body.addEventListener("dragover", e => e.preventDefault());
+document.body.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { try { loadFromText(f.name, reader.result); } catch (err) { toast("Hata: " + err.message, 5000); } };
+  reader.readAsText(f);
+});
+
+// Stop button (created here to keep controls tidy)
+const stopBtn = document.createElement("button");
+stopBtn.className = "btn btn-stop hidden";
+stopBtn.id = "btnStop";
+stopBtn.innerHTML = "&#9632; Durdur";
+stopBtn.onclick = () => stopNav();
+$("controls").appendChild(stopBtn);
+
+$("langTR").onclick = () => { voiceLang = "tr"; $("langTR").classList.add("active"); $("langDE").classList.remove("active"); };
+$("langDE").onclick = () => { voiceLang = "de"; $("langDE").classList.add("active"); $("langTR").classList.remove("active"); };
+
+/* ═══════════ First launch: ask for location permission & center map ═══════════ */
+(function initLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      const here = [p.coords.latitude, p.coords.longitude];
+      if (!route) map.setView(here, 15);
+      L.circleMarker(here, { radius: 8, color: "#fff", fillColor: "#2b7fff", fillOpacity: 1, weight: 3 })
+        .addTo(map).bindTooltip("Konumun");
+      toast("Konum izni verildi ✓");
+    },
+    err => {
+      if (err.code === 1) toast("Konum izni verilmedi. Chrome adres çubuğundaki kilit simgesinden izin verebilirsin.", 6000);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+  );
+})();
+</script>
+</body>
+</html>
