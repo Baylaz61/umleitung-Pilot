@@ -9,17 +9,17 @@
 <style>
   :root{
     --sign:#f7c600; --sign-ink:#141414;
-    --panel:#ffffff; --line:#e3e5e8;
-    --text:#1c1e21; --muted:#6b7280;
-    --blue:#2b7fff; --ok:#22a95c; --warn:#e5443a;
+    --line:#e3e5e8; --text:#1c1e21; --muted:#70757a;
+    --gblue:#4356f2; --gblue-dark:#2a3ac2;
+    --teal:#0b7d75; --red:#ea4335; --ok:#188038;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
-  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#f2f3f5;color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+  body{font-family:'Google Sans',system-ui,-apple-system,Roboto,sans-serif;background:#f2f3f5;color:var(--text);display:flex;flex-direction:column;overflow:hidden}
 
-  header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0;z-index:20}
-  .logo{background:var(--sign);color:var(--sign-ink);font-weight:900;letter-spacing:.02em;padding:3px 9px;border-radius:4px;border:2px solid var(--sign-ink);font-size:13px;text-transform:uppercase}
-  header .sub{font-size:11px;color:var(--muted);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header{display:flex;align-items:center;gap:10px;padding:7px 12px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0;z-index:20}
+  .logo{background:var(--sign);color:var(--sign-ink);font-weight:900;padding:3px 8px;border-radius:4px;border:2px solid var(--sign-ink);font-size:12px;text-transform:uppercase}
+  header .sub{font-size:11px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   header .spacer{flex:1}
   .lang-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .lang-toggle button{background:#fff;color:var(--muted);border:0;padding:6px 11px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer}
@@ -28,60 +28,63 @@
   #wrap{position:relative;flex:1;min-height:0}
   #map{position:absolute;inset:0}
 
-  /* Compact instruction pill — Google Maps style, doesn't block the map */
-  #hud{
-    display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;
-    background:var(--sign);color:var(--sign-ink);border:2px solid var(--sign-ink);border-radius:12px;
-    box-shadow:0 3px 10px rgba(0,0,0,.22);padding:5px 12px;align-items:center;gap:8px;max-width:80%;
-  }
+  /* Compact turn pill (small, like Google) */
+  #hud{display:none;position:absolute;top:10px;left:10px;z-index:30;background:var(--ok);color:#fff;border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:7px 12px;align-items:center;gap:9px}
   #hud.on{display:flex}
-  #hud .arrow{font-size:20px;line-height:1;font-weight:900}
-  #hud .dist{font-size:15px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
-  #hud .what{font-size:10px;font-weight:600;white-space:nowrap}
+  #hud .arrow{font-size:22px;line-height:1;font-weight:900}
+  #hud .dist{font-size:16px;font-weight:800;white-space:nowrap;line-height:1.1}
+  #hud .what{font-size:10px;font-weight:600;opacity:.9;white-space:nowrap}
 
-  /* Bottom ETA bar — thin, transparent */
-  #etabar{
-    display:none;position:absolute;left:10px;bottom:12px;z-index:30;
-    background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,.15);padding:8px 14px;font-size:12px;color:var(--muted);
-  }
-  #etabar b{color:var(--text);font-size:16px}
-  #etabar .phase{font-weight:700;color:var(--blue)}
-  #etabar.offroute{border-color:var(--warn)}
-  #etabar.offroute .phase{color:var(--warn)}
-
-  /* Recenter button */
-  #recenter{
-    display:none;position:absolute;right:12px;bottom:14px;z-index:30;width:48px;height:48px;border-radius:50%;
-    background:#fff;border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.2);
-    font-size:22px;color:var(--blue);cursor:pointer;align-items:center;justify-content:center;
-  }
+  /* Recenter — white circle with blue dot, like Google */
+  #recenter{display:none;position:absolute;right:12px;bottom:14px;z-index:30;width:52px;height:52px;border-radius:50%;background:#fff;border:0;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;align-items:center;justify-content:center}
   #recenter.show{display:flex}
+  #recenter .dot{width:16px;height:16px;border-radius:50%;background:#1a73e8;box-shadow:0 0 0 5px #d2e3fc}
 
-  /* Position arrow marker */
-  .pos-arrow{width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:26px solid var(--blue);filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));position:relative}
-  .pos-arrow::after{content:"";position:absolute;left:-7px;top:8px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:16px solid #fff}
-
-  /* Empty hint */
-  #empty{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:25;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.15);padding:18px 22px;text-align:center;max-width:300px}
-  #empty .sign-demo{display:inline-block;background:var(--sign);color:var(--sign-ink);border:2px solid var(--sign-ink);border-radius:6px;font-weight:900;font-size:16px;padding:5px 14px;transform:rotate(-2deg);margin-bottom:10px}
-  #empty p{color:var(--muted);font-size:13px;line-height:1.5}
+  /* Position markers */
+  .pos-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .pos-arrow{width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:28px solid #1a73e8;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45));position:relative}
+  .pos-arrow::after{content:"";position:absolute;left:-8px;top:9px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:17px solid #fff}
+  .dest-pin{width:26px;height:26px;background:var(--red);border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #b3170b;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+  .dest-pin::after{content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#7a0f06}
+  .time-chip{background:var(--gblue);color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap;position:relative}
+  .time-chip::after{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);border:8px solid transparent;border-right-color:var(--gblue);border-left:0}
 
   #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:60;background:#1c1e21;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
   #toast.show{opacity:1}
 
-  #controls{flex-shrink:0;display:flex;gap:8px;padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff;z-index:20}
-  .btn{flex:1;border:0;border-radius:12px;padding:14px 8px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-  .btn:active{transform:scale(.97)}
-  .btn-load{background:#f2f3f5;color:var(--text);border:1px solid var(--line)}
-  .btn-go{background:var(--sign);color:var(--sign-ink)}
-  .btn-go:disabled{opacity:.35;cursor:default}
-  .btn-stop{background:var(--warn);color:#fff}
-  .btn-sim{flex:0 0 auto;background:#f2f3f5;color:var(--muted);border:1px solid var(--line);font-size:12px;padding:14px 12px}
-  .hidden{display:none!important}
+  /* ── Google-style bottom sheet ── */
+  #sheet{flex-shrink:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.12);padding:8px 18px 14px;padding-bottom:calc(14px + env(safe-area-inset-bottom));z-index:25;margin-top:-20px;position:relative}
+  .handle{width:44px;height:5px;border-radius:3px;background:#dadce0;margin:4px auto 10px}
+  .state{display:none}
+  .state.on{display:block}
+
+  /* empty state */
+  #stEmpty .hint{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:12px}
+  .btnrow{display:flex;gap:10px;align-items:center}
+  .pill{border:0;border-radius:26px;padding:14px 24px;font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+  .pill:active{transform:scale(.97)}
+  .pill-teal{background:var(--teal);color:#fff}
+  .pill-light{background:#e8f0fe;color:#1a58c2}
+  .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:11px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  label.pill, label.chip{user-select:none}
+
+  /* loaded state — like the Google route summary */
+  #stLoaded .big{font-size:28px;font-weight:800;letter-spacing:-.02em}
+  #stLoaded .big .km{color:var(--muted);font-weight:700}
+  #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 14px}
+  /* nav state */
+  #stNav{display:none;align-items:center;gap:14px}
+  #stNav.on{display:flex}
+  #stNav .eta-main{font-size:22px;font-weight:800;color:var(--ok)}
+  #stNav .eta-sub{font-size:12px;color:var(--muted)}
+  #stNav .phase{font-size:11px;font-weight:800;color:var(--gblue);text-transform:uppercase;letter-spacing:.04em}
+  #stNav.offroute .phase{color:var(--red)}
+  #stNav .spacer{flex:1}
+  .btn-x{width:52px;height:52px;border-radius:50%;border:0;background:#fce8e6;color:var(--red);font-size:22px;font-weight:900;cursor:pointer}
 
   #pasteModal{display:none;position:absolute;inset:0;z-index:80;background:rgba(255,255,255,.97);padding:18px;flex-direction:column;gap:10px}
   #pasteModal textarea{flex:1;background:#f7f8fa;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-family:monospace;font-size:12px;resize:none}
+  .hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -102,11 +105,6 @@
 <div id="wrap">
   <div id="map"></div>
 
-  <div id="empty">
-    <div class="sign-demo">Umleitung &#10141;</div>
-    <p><b>KML</b> veya <b>GPX</b> dosyanı yükle. Bulunduğun yerden başlangıca <b>otobüs geçebilecek yollardan</b> götürür, sonra Umleitung'u sesli anlatır.</p>
-  </div>
-
   <div id="hud">
     <div class="arrow" id="hudArrow">&#8593;</div>
     <div>
@@ -115,86 +113,97 @@
     </div>
   </div>
 
-  <div id="etabar">
-    <span class="phase" id="etaPhase">Başlangıca</span>&nbsp;
-    <b id="etaDist">–</b> · <b id="etaTime">–</b>
-    &nbsp;·&nbsp;<span id="etaSpeed">0</span> km/h
-  </div>
-
-  <button id="recenter" title="Konuma dön">&#9678;</button>
+  <button id="recenter" title="Konuma dön"><span class="dot"></span></button>
   <div id="toast"></div>
 
   <div id="pasteModal">
     <div style="font-weight:800;font-size:15px">KML / GPX içeriğini yapıştır</div>
     <textarea id="pasteArea" placeholder="Dosya içeriğini buraya yapıştır"></textarea>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-load" id="pasteCancel">Vazgeç</button>
-      <button class="btn btn-go" id="pasteOk">Rotayı Çiz</button>
+    <div class="btnrow">
+      <button class="chip" id="pasteCancel">Vazgeç</button>
+      <button class="pill pill-teal" id="pasteOk">Rotayı Çiz</button>
     </div>
   </div>
 </div>
 
-<div id="controls">
+<div id="sheet">
+  <div class="handle"></div>
+
+  <div class="state on" id="stEmpty">
+    <div class="hint"><b>KML</b> veya <b>GPX</b> dosyanı yükle — bulunduğun yerden başlangıca otobüs geçebilecek yollardan götürür, sonra Umleitung'u sesli anlatır.</div>
+    <div class="btnrow">
+      <label class="pill pill-teal" for="fileInput">&#128194; Dosya Yükle</label>
+      <button class="chip" id="btnPaste">&#128203; Yapıştır</button>
+    </div>
+  </div>
+
+  <div class="state" id="stLoaded">
+    <div class="big"><span id="sumTime">–</span> <span class="km">(<span id="sumDist">–</span>)</span></div>
+    <div class="subtitle" id="sumSub">Umleitung rotası</div>
+    <div class="btnrow">
+      <button class="pill pill-teal" id="btnGo">&#9650; Başlat</button>
+      <button class="chip" id="btnSim">SİM test</button>
+      <label class="chip" for="fileInput">Yeni dosya</label>
+    </div>
+  </div>
+
+  <div class="state" id="stNav">
+    <button class="btn-x" id="btnStop">&#10005;</button>
+    <div>
+      <div class="phase" id="etaPhase">Başlangıca</div>
+      <div class="eta-main" id="etaTime">–</div>
+      <div class="eta-sub"><span id="etaDist">–</span> · <span id="etaSpeed">0</span> km/h</div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
   <input type="file" id="fileInput" accept=".kml,.gpx" class="hidden">
-  <button class="btn btn-load" id="btnLoad">&#128194; Yükle</button>
-  <button class="btn btn-load" id="btnPaste" style="flex:0 0 auto;padding:14px 12px">&#128203;</button>
-  <button class="btn btn-go" id="btnGo" disabled>&#9654; Başlat</button>
-  <button class="btn btn-sim hidden" id="btnSim">SİM<span style="font-size:9px;font-weight:600">test</span></button>
-  <button class="btn btn-stop hidden" id="btnStop">&#9632; Durdur</button>
 </div>
 
 <script>
 "use strict";
 
 /* ═══════ State ═══════ */
-let map, posMarker = null, mapReady = false;
-let baseRoute = null;    // loaded KML/GPX
-let route = null;        // active nav route (approach + base)
-let navActive = false, watchId = null, simTimer = null, wakeLock = null;
-let voiceLang = 'tr';
-let nextTurnIdx = 0, announced = {}, arrivalSpoken = false, onMainSpoken = true;
-let follow = true;
-let lastFix = null;      // {lat,lng,heading,speed,t}
-let smoothSpeed = 0;
-let markerAnim = null;
+let map, posMarker=null, destMarker=null, chipMarker=null, mapReady=false;
+let baseRoute=null, route=null;
+let navActive=false, watchId=null, simTimer=null, wakeLock=null;
+let voiceLang='tr';
+let nextTurnIdx=0, announced={}, arrivalSpoken=false, onMainSpoken=true;
+let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
+const BUS_AVG_KMH=22; // realistic city-bus average for estimates
 
-const $ = id => document.getElementById(id);
+const $=id=>document.getElementById(id);
 
-/* ═══════ Map init (MapLibre GL — supports rotation & smooth camera) ═══════ */
-map = new maplibregl.Map({
-  container: 'map',
-  style: {
-    version: 8,
-    sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap' } },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-  },
-  center: [9.73, 52.35], zoom: 12, pitch: 0, attributionControl: true
+/* ═══════ Map (MapLibre GL) ═══════ */
+map=new maplibregl.Map({
+  container:'map',
+  style:{version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap'}},layers:[{id:'osm',type:'raster',source:'osm'}]},
+  center:[9.73,52.35],zoom:12,attributionControl:true
 });
-map.touchZoomRotate.enable();
-map.on('load', () => {
-  mapReady = true;
-  map.addSource('approach', { type: 'geojson', data: emptyGeo() });
-  map.addSource('main', { type: 'geojson', data: emptyGeo() });
-  map.addSource('marks', { type: 'geojson', data: emptyGeo() });
-  map.addLayer({ id: 'approach-casing', type: 'line', source: 'approach', paint: { 'line-color': '#0d4fb3', 'line-width': 9 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
-  map.addLayer({ id: 'approach-line', type: 'line', source: 'approach', paint: { 'line-color': '#2b7fff', 'line-width': 6 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
-  map.addLayer({ id: 'main-casing', type: 'line', source: 'main', paint: { 'line-color': '#141414', 'line-width': 9 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
-  map.addLayer({ id: 'main-line', type: 'line', source: 'main', paint: { 'line-color': '#f7c600', 'line-width': 6 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
-  map.addLayer({ id: 'marks-circles', type: 'circle', source: 'marks', paint: {
-    'circle-radius': 7, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#141414', 'circle-stroke-width': 2 } });
+map.on('load',()=>{
+  mapReady=true;
+  map.addSource('approach',{type:'geojson',data:emptyGeo()});
+  map.addSource('main',{type:'geojson',data:emptyGeo()});
+  map.addSource('startpt',{type:'geojson',data:emptyGeo()});
+  /* Google-style: dark navy casing + vivid blue fill, rounded */
+  map.addLayer({id:'approach-casing',type:'line',source:'approach',paint:{'line-color':'#2a3ac2','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
+  map.addLayer({id:'approach-line',type:'line',source:'approach',paint:{'line-color':'#4356f2','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
+  map.addLayer({id:'main-casing',type:'line',source:'main',paint:{'line-color':'#141414','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
+  map.addLayer({id:'main-line',type:'line',source:'main',paint:{'line-color':'#f7c600','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
+  map.addLayer({id:'startpt-circle',type:'circle',source:'startpt',paint:{'circle-radius':7,'circle-color':'#188038','circle-stroke-color':'#fff','circle-stroke-width':3}});
 });
-function emptyGeo(){ return { type: 'FeatureCollection', features: [] }; }
-function lineFeature(pts){ return { type:'FeatureCollection', features:[{ type:'Feature', geometry:{ type:'LineString', coordinates: pts.map(p=>[p.lng,p.lat]) }, properties:{} }] }; }
+function emptyGeo(){return {type:'FeatureCollection',features:[]};}
+function lineFeature(pts){return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:pts.map(p=>[p.lng,p.lat])},properties:{}}]};}
 
-/* Any user gesture (drag, two-finger rotate, pinch zoom) pauses follow so the map never snaps back */
-function pauseFollow(e){ if(navActive && e && e.originalEvent){ follow=false; $("recenter").classList.add("show"); } }
-map.on('movestart', pauseFollow);
-map.on('rotatestart', pauseFollow);
-map.on('zoomstart', pauseFollow);
-$("recenter").onclick = () => { follow = true; $("recenter").classList.remove("show"); if (lastFix) cameraTo(lastFix, 300); };
+/* Any user gesture pauses follow — the map never snaps back */
+function pauseFollow(e){if(navActive&&e&&e.originalEvent){follow=false;$("recenter").classList.add("show");}}
+map.on('movestart',pauseFollow);
+map.on('rotatestart',pauseFollow);
+map.on('zoomstart',pauseFollow);
+$("recenter").onclick=()=>{follow=true;$("recenter").classList.remove("show");if(lastFix)cameraTo(lastFix,300);};
 
 /* ═══════ Geometry ═══════ */
-const R = 6371000, toRad = d => d*Math.PI/180, toDeg = r => r*180/Math.PI;
+const R=6371000,toRad=d=>d*Math.PI/180,toDeg=r=>r*180/Math.PI;
 function haversine(a,b){const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
 function bearing(a,b){const y=Math.sin(toRad(b.lng-a.lng))*Math.cos(toRad(b.lat));const x=Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat))-Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng-a.lng));return (toDeg(Math.atan2(y,x))+360)%360;}
 function angleDiff(b1,b2){let d=b2-b1;while(d>180)d-=360;while(d<-180)d+=360;return d;}
@@ -210,6 +219,14 @@ function projectOnRoute(p){
     if(d<best.d){best.d=d;best.s=route.cum[i]+t*(route.cum[i+1]-route.cum[i]);}
   }
   return best;
+}
+function pointAtS(r,s){
+  let i=1;while(i<r.cum.length&&r.cum[i]<s)i++;
+  i=Math.min(i,r.pts.length-1);
+  const a=r.pts[i-1],b=r.pts[i];
+  const seg=r.cum[i]-r.cum[i-1]||1;
+  const t=Math.max(0,Math.min(1,(s-r.cum[i-1])/seg));
+  return {lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t};
 }
 
 /* ═══════ Parsing ═══════ */
@@ -273,35 +290,53 @@ function speak(text){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtt
 /* ═══════ UI helpers ═══════ */
 function toast(msg,ms=3500){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>$("toast").classList.remove("show"),ms);}
 function fmtDist(m){return m>=1000?(m/1000).toFixed(1).replace(".",",")+" km":Math.round(m/10)*10+" m";}
-function fmtTime(min){if(min<1)return "<1 dk";if(min<60)return Math.round(min)+" dk";return Math.floor(min/60)+" sa "+Math.round(min%60)+" dk";}
+function fmtTime(min){if(min<1)return "1 dk";if(min<60)return Math.round(min)+" dk";return Math.floor(min/60)+" sa "+Math.round(min%60)+" dk";}
+function setSheet(state){["stEmpty","stLoaded","stNav"].forEach(id=>$(id).classList.toggle("on",id===state));}
 
 /* ═══════ Route display ═══════ */
+function makeDomMarker(className,html){
+  const el=document.createElement('div');el.className=className;if(html)el.innerHTML=html;return el;
+}
 function displayRoute(r){
   if(!mapReady){map.once('load',()=>displayRoute(r));return;}
   const ai=r.approachIdx||0;
   map.getSource('approach').setData(ai>0?lineFeature(r.pts.slice(0,ai+1)):emptyGeo());
   map.getSource('main').setData(lineFeature(r.pts.slice(ai)));
-  const marks={type:'FeatureCollection',features:[
-    {type:'Feature',geometry:{type:'Point',coordinates:[r.pts[ai].lng,r.pts[ai].lat]},properties:{color:'#22a95c'}},
-    {type:'Feature',geometry:{type:'Point',coordinates:[r.pts[r.pts.length-1].lng,r.pts[r.pts.length-1].lat]},properties:{color:'#e5443a'}}
-  ]};
-  map.getSource('marks').setData(marks);
+  map.getSource('startpt').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[r.pts[ai].lng,r.pts[ai].lat]},properties:{}}]});
+
+  /* red destination pin (DOM marker, like Google) */
+  const end=r.pts[r.pts.length-1];
+  if(destMarker)destMarker.remove();
+  destMarker=new maplibregl.Marker({element:makeDomMarker('dest-pin'),anchor:'bottom'}).setLngLat([end.lng,end.lat]).addTo(map);
+
+  /* blue time chip at route midpoint */
+  const est=fmtTime((r.total/1000)/BUS_AVG_KMH*60);
+  const mid=pointAtS(r,r.total*0.5);
+  if(chipMarker)chipMarker.remove();
+  chipMarker=new maplibregl.Marker({element:makeDomMarker('time-chip','≈ '+est),anchor:'left',offset:[10,0]}).setLngLat([mid.lng,mid.lat]).addTo(map);
+
   if(!navActive){
     let minLat=90,maxLat=-90,minLng=180,maxLng=-180;
     r.pts.forEach(p=>{minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLng=Math.min(minLng,p.lng);maxLng=Math.max(maxLng,p.lng);});
-    map.fitBounds([[minLng,minLat],[maxLng,maxLat]],{padding:60,duration:600});
+    map.fitBounds([[minLng,minLat],[maxLng,maxLat]],{padding:70,duration:600});
   }
-  $("routeName").textContent=`${r.name} · ${fmtDist(r.total)} · ${r.turns.length} dönüş`;
-  $("empty").classList.add("hidden");
-  $("btnGo").disabled=false;
-  $("btnSim").classList.remove("hidden");
+  $("routeName").textContent=r.name;
+  $("sumTime").textContent="≈ "+est;
+  $("sumDist").textContent=fmtDist(r.total);
+  $("sumSub").textContent=(voiceLang==="tr"?"Otobüs rotası · ":"Busroute · ")+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
+  if(!navActive)setSheet("stLoaded");
 }
 
-/* ═══════ Position marker: smooth interpolation between GPS fixes ═══════ */
-function ensureMarker(lat,lng){
-  if(posMarker)return;
-  const el=document.createElement('div');el.className='pos-arrow';
-  posMarker=new maplibregl.Marker({element:el,rotationAlignment:'map',anchor:'center'}).setLngLat([lng,lat]).addTo(map);
+/* ═══════ Marker & camera ═══════ */
+function setMarkerMode(mode){ // 'dot' | 'arrow'
+  const el=makeDomMarker(mode==='arrow'?'pos-arrow':'pos-dot');
+  const pos=posMarker?posMarker.getLngLat():null;
+  if(posMarker)posMarker.remove();
+  posMarker=new maplibregl.Marker({element:el,rotationAlignment:mode==='arrow'?'map':'viewport',anchor:'center'});
+  if(pos)posMarker.setLngLat(pos).addTo(map);
+}
+function ensureMarker(lat,lng,mode){
+  if(!posMarker){setMarkerMode(mode||'dot');posMarker.setLngLat([lng,lat]).addTo(map);}
 }
 function moveMarkerSmooth(from,to,heading,dur=900){
   if(markerAnim)cancelAnimationFrame(markerAnim);
@@ -315,7 +350,7 @@ function moveMarkerSmooth(from,to,heading,dur=900){
   markerAnim=requestAnimationFrame(step);
 }
 function cameraTo(fix,dur=900){
-  map.easeTo({center:[fix.lng,fix.lat],bearing:fix.heading||0,duration:dur,easing:t=>t}); // keeps user's zoom
+  map.easeTo({center:[fix.lng,fix.lat],bearing:fix.heading||0,duration:dur,easing:t=>t});
 }
 
 /* ═══════ Nav core ═══════ */
@@ -324,28 +359,26 @@ function updateHUD(remaining,turn){
   if(!turn){$("hudArrow").innerHTML="&#127937;";$("hudDist").textContent=fmtDist(remaining);$("hudWhat").textContent=voiceLang==="tr"?"Hedef":"Ziel";return;}
   $("hudArrow").innerHTML=turn.dir==="R"?"&#10548;":"&#10547;";
   $("hudDist").textContent=fmtDist(remaining);
-  $("hudWhat").textContent=(turn.dir==="R"?P().turnR:P().turnL)+(turn.angle>110?" ("+P().sharp(turn.dir)+")":"");
+  $("hudWhat").textContent=(turn.dir==="R"?P().turnR:P().turnL)+(turn.angle>110?" · "+P().sharp(turn.dir):"");
 }
 function updateETA(proj){
-  const bar=$("etabar");bar.style.display="block";
   const inApproach=(route.approachS||0)>0&&proj.s<route.approachS;
   const target=inApproach?route.approachS:route.total;
   const rem=Math.max(0,target-proj.s);
-  const spd=Math.max(smoothSpeed,25/3.6); // assume min 25 km/h for ETA
+  const spd=Math.max(smoothSpeed,BUS_AVG_KMH/3.6);
   $("etaPhase").textContent=inApproach?P().toStart:P().toEnd;
-  $("etaDist").textContent=fmtDist(rem);
   $("etaTime").textContent=fmtTime(rem/spd/60);
+  $("etaDist").textContent=fmtDist(rem);
   $("etaSpeed").textContent=Math.round(smoothSpeed*3.6);
 }
 function onPosition(lat,lng,speedMs,gpsHeading){
   if(!navActive||!route)return;
   const prev=lastFix;
-  let heading=gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1?gpsHeading:
-              (prev?bearing(prev,{lat,lng}):0);
-  if(prev&&haversine(prev,{lat,lng})<2)heading=prev.heading; // don't spin when standing
+  let heading=gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1?gpsHeading:(prev?bearing(prev,{lat,lng}):0);
+  if(prev&&haversine(prev,{lat,lng})<2)heading=prev.heading;
   const fix={lat,lng,heading,speed:speedMs};
   if(speedMs!=null&&isFinite(speedMs))smoothSpeed=smoothSpeed*.7+speedMs*.3;
-  ensureMarker(lat,lng);
+  ensureMarker(lat,lng,'arrow');
   if(prev)moveMarkerSmooth(prev,fix,heading);else posMarker.setLngLat([lng,lat]);
   if(follow)cameraTo(fix);
   lastFix=fix;
@@ -354,11 +387,11 @@ function onPosition(lat,lng,speedMs,gpsHeading){
   if(!onMainSpoken&&proj.s>=(route.approachS||0)){onMainSpoken=true;speak(P().onroute);}
   updateETA(proj);
 
-  const bar=$("etabar");
+  const nav=$("stNav");
   if(proj.d>60){
-    if(!bar.classList.contains("offroute")){bar.classList.add("offroute");speak(P().offroute);}
+    if(!nav.classList.contains("offroute")){nav.classList.add("offroute");speak(P().offroute);}
     return;
-  }else if(bar.classList.contains("offroute")){bar.classList.remove("offroute");speak(P().back);}
+  }else if(nav.classList.contains("offroute")){nav.classList.remove("offroute");speak(P().back);}
 
   while(nextTurnIdx<route.turns.length&&route.turns[nextTurnIdx].s<proj.s-25)nextTurnIdx++;
   const turn=route.turns[nextTurnIdx]||null;
@@ -400,7 +433,6 @@ function decodePolyline(str,precision){
   }
   return coords;
 }
-/* Valhalla with BUS profile (2.55 m width, avoids roads buses can't use). OSRM car as fallback. */
 async function fetchApproach(from,to){
   try{
     const body={locations:[{lat:from.lat,lon:from.lng},{lat:to.lat,lon:to.lng}],
@@ -413,7 +445,6 @@ async function fetchApproach(from,to){
     if(!shape)throw new Error("Rota bulunamadı");
     return {pts:decodePolyline(shape,6),profile:"bus"};
   }catch(e){
-    // fallback: OSRM (car profile — bus restrictions NOT applied)
     const url=`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
     const res=await fetch(url);
     if(!res.ok)throw new Error("Rota servisi cevap vermedi");
@@ -449,7 +480,7 @@ async function startNav(simulate=false){
         const appr=await fetchApproach(here,start);
         route=buildCombined(appr.pts,baseRoute);
         displayRoute(route);
-        if(appr.profile==="car")toast("Uyarı: otobüs profili şu an ulaşılamadı, standart araç rotası kullanılıyor.",6000);
+        if(appr.profile==="car")toast("Uyarı: otobüs profili ulaşılamadı, standart araç rotası kullanılıyor.",6000);
       }catch(e){toast("Başlangıç rotası alınamadı: "+e.message,6000);}
     }
   }else{
@@ -458,9 +489,9 @@ async function startNav(simulate=false){
   navActive=true;nextTurnIdx=0;announced={};arrivalSpoken=false;follow=true;lastFix=null;smoothSpeed=0;
   onMainSpoken=(route.approachS===0);
   $("recenter").classList.remove("show");
-  $("btnGo").classList.add("hidden");$("btnLoad").classList.add("hidden");
-  $("btnPaste").classList.add("hidden");$("btnSim").classList.add("hidden");
-  $("btnStop").classList.remove("hidden");
+  setSheet("stNav");
+  setMarkerMode('arrow');
+  if(chipMarker){chipMarker.remove();chipMarker=null;} /* clear chip during nav — clean screen */
   map.easeTo({zoom:17,duration:600});
   speak(route.approachS>0?P().approach:P().start);
   try{wakeLock=await navigator.wakeLock?.request("screen");}catch(e){}
@@ -468,11 +499,8 @@ async function startNav(simulate=false){
     let s=0;const step=12.5;
     simTimer=setInterval(()=>{
       s+=step;if(s>=route.total)s=route.total;
-      let i=1;while(i<route.cum.length&&route.cum[i]<s)i++;
-      const a=route.pts[i-1],b=route.pts[Math.min(i,route.pts.length-1)];
-      const seg=route.cum[Math.min(i,route.cum.length-1)]-route.cum[i-1]||1;
-      const t=(s-route.cum[i-1])/seg;
-      onPosition(a.lat+(b.lat-a.lat)*t,a.lng+(b.lng-a.lng)*t,12.5,null);
+      const p=pointAtS(route,s);
+      onPosition(p.lat,p.lng,12.5,null);
       if(s>=route.total)clearInterval(simTimer);
     },1000);
     toast("Simülasyon — sanal test sürüşü");
@@ -489,15 +517,15 @@ function stopNav(finished=false){
   if(simTimer){clearInterval(simTimer);simTimer=null;}
   if(markerAnim)cancelAnimationFrame(markerAnim);
   try{wakeLock?.release();}catch(e){}wakeLock=null;
-  $("hud").classList.remove("on");$("etabar").style.display="none";
+  $("hud").classList.remove("on");
   $("recenter").classList.remove("show");
-  $("btnStop").classList.add("hidden");$("btnGo").classList.remove("hidden");
-  $("btnLoad").classList.remove("hidden");$("btnPaste").classList.remove("hidden");$("btnSim").classList.remove("hidden");
+  $("stNav").classList.remove("offroute");
   if(posMarker){posMarker.remove();posMarker=null;}
   lastFix=null;
   if(!finished)speechSynthesis.cancel();
   map.easeTo({bearing:0,duration:500});
-  if(baseRoute){route=baseRoute;route.approachIdx=0;route.approachS=0;displayRoute(baseRoute);}
+  if(baseRoute){route=baseRoute;route.approachIdx=0;route.approachS=0;displayRoute(baseRoute);setSheet("stLoaded");}
+  else setSheet("stEmpty");
 }
 
 /* ═══════ Load ═══════ */
@@ -509,11 +537,11 @@ function loadFromText(name,text){
   displayRoute(r);
   toast(`Rota yüklendi: ${r.turns.length} dönüş noktası bulundu`);
 }
-$("btnLoad").onclick=()=>$("fileInput").click();
 $("fileInput").onchange=e=>{
   const f=e.target.files[0];if(!f)return;
   const reader=new FileReader();
   reader.onload=()=>{try{loadFromText(f.name,reader.result);}catch(err){toast("Hata: "+err.message,5000);}};
+  reader.onerror=()=>toast("Dosya okunamadı",4000);
   reader.readAsText(f);e.target.value="";
 };
 $("btnGo").onclick=()=>startNav(false);
@@ -536,15 +564,17 @@ document.body.addEventListener("drop",e=>{
   reader.onload=()=>{try{loadFromText(f.name,reader.result);}catch(err){toast("Hata: "+err.message,5000);}};
   reader.readAsText(f);
 });
-$("langTR").onclick=()=>{voiceLang="tr";$("langTR").classList.add("active");$("langDE").classList.remove("active");};
-$("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("langTR").classList.remove("active");};
+$("langTR").onclick=()=>{voiceLang="tr";$("langTR").classList.add("active");$("langDE").classList.remove("active");if(baseRoute)displayRoute(route);};
+$("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("langTR").classList.remove("active");if(baseRoute)displayRoute(route);};
 
-/* ═══════ First launch: ask location permission, center map ═══════ */
+/* ═══════ First launch: location permission + blue dot ═══════ */
 (function initLocation(){
   if(!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(
     p=>{
-      if(!baseRoute)map.easeTo({center:[p.coords.longitude,p.coords.latitude],zoom:15,duration:800});
+      const lat=p.coords.latitude,lng=p.coords.longitude;
+      if(!baseRoute)map.easeTo({center:[lng,lat],zoom:15,duration:800});
+      ensureMarker(lat,lng,'dot');
       toast("Konum izni verildi ✓");
     },
     err=>{if(err.code===1)toast("Konum izni verilmedi. Chrome'da adres çubuğundaki kilit simgesinden izin verebilirsin.",6000);},
