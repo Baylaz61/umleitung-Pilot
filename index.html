@@ -32,12 +32,12 @@
   #hud{
     display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;
     background:var(--sign);color:var(--sign-ink);border:2px solid var(--sign-ink);border-radius:12px;
-    box-shadow:0 4px 14px rgba(0,0,0,.25);padding:8px 16px;align-items:center;gap:12px;max-width:92%;
+    box-shadow:0 3px 10px rgba(0,0,0,.22);padding:5px 12px;align-items:center;gap:8px;max-width:80%;
   }
   #hud.on{display:flex}
-  #hud .arrow{font-size:30px;line-height:1;font-weight:900}
-  #hud .dist{font-size:24px;font-weight:900;letter-spacing:-.01em;white-space:nowrap}
-  #hud .what{font-size:12px;font-weight:700;white-space:nowrap}
+  #hud .arrow{font-size:20px;line-height:1;font-weight:900}
+  #hud .dist{font-size:15px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+  #hud .what{font-size:10px;font-weight:600;white-space:nowrap}
 
   /* Bottom ETA bar — thin, transparent */
   #etabar{
@@ -186,8 +186,11 @@ map.on('load', () => {
 function emptyGeo(){ return { type: 'FeatureCollection', features: [] }; }
 function lineFeature(pts){ return { type:'FeatureCollection', features:[{ type:'Feature', geometry:{ type:'LineString', coordinates: pts.map(p=>[p.lng,p.lat]) }, properties:{} }] }; }
 
-/* Only manual DRAG disables follow — zooming stays free and keeps following */
-map.on('dragstart', () => { if (navActive) { follow = false; $("recenter").classList.add("show"); } });
+/* Any user gesture (drag, two-finger rotate, pinch zoom) pauses follow so the map never snaps back */
+function pauseFollow(e){ if(navActive && e && e.originalEvent){ follow=false; $("recenter").classList.add("show"); } }
+map.on('movestart', pauseFollow);
+map.on('rotatestart', pauseFollow);
+map.on('zoomstart', pauseFollow);
 $("recenter").onclick = () => { follow = true; $("recenter").classList.remove("show"); if (lastFix) cameraTo(lastFix, 300); };
 
 /* ═══════ Geometry ═══════ */
