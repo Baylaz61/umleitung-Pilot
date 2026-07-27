@@ -4,14 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Umleitung Pilot</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --sign:#f7c600; --sign-ink:#141414;
     --line:#e3e5e8; --text:#1c1e21; --muted:#70757a;
-    --gblue:#4356f2; --gblue-dark:#2a3ac2;
-    --teal:#0b7d75; --red:#ea4335; --ok:#188038;
+    --gblue:#4356f2; --teal:#0b7d75; --red:#ea4335; --ok:#188038;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -26,54 +27,46 @@
   .lang-toggle button.active{background:var(--sign);color:var(--sign-ink)}
 
   #wrap{position:relative;flex:1;min-height:0}
-  #map{position:absolute;inset:0}
+  #map{position:absolute;inset:0;background:#e8eaed}
+  #engineTag{position:absolute;left:8px;bottom:4px;z-index:29;font-size:9px;color:#9aa0a6;background:rgba(255,255,255,.7);padding:1px 5px;border-radius:4px}
 
-  /* Compact turn pill (small, like Google) */
   #hud{display:none;position:absolute;top:10px;left:10px;z-index:30;background:var(--ok);color:#fff;border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:7px 12px;align-items:center;gap:9px}
   #hud.on{display:flex}
   #hud .arrow{font-size:22px;line-height:1;font-weight:900}
   #hud .dist{font-size:16px;font-weight:800;white-space:nowrap;line-height:1.1}
   #hud .what{font-size:10px;font-weight:600;opacity:.9;white-space:nowrap}
 
-  /* Recenter — white circle with blue dot, like Google */
   #recenter{display:none;position:absolute;right:12px;bottom:14px;z-index:30;width:52px;height:52px;border-radius:50%;background:#fff;border:0;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;align-items:center;justify-content:center}
   #recenter.show{display:flex}
   #recenter .dot{width:16px;height:16px;border-radius:50%;background:#1a73e8;box-shadow:0 0 0 5px #d2e3fc}
 
-  /* Position markers */
   .pos-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .pos-arrow-outer{width:24px;height:28px}
   .pos-arrow{width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:28px solid #1a73e8;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45));position:relative}
   .pos-arrow::after{content:"";position:absolute;left:-8px;top:9px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:17px solid #fff}
   .dest-pin{width:26px;height:26px;background:var(--red);border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #b3170b;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.35)}
   .dest-pin::after{content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#7a0f06}
-  .time-chip{background:var(--gblue);color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap;position:relative}
-  .time-chip::after{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);border:8px solid transparent;border-right-color:var(--gblue);border-left:0}
+  .start-dot{width:15px;height:15px;border-radius:50%;background:var(--ok);border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+  .time-chip{background:var(--gblue);color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap}
 
   #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:60;background:#1c1e21;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
   #toast.show{opacity:1}
 
-  /* ── Google-style bottom sheet ── */
   #sheet{flex-shrink:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.12);padding:8px 18px 14px;padding-bottom:calc(14px + env(safe-area-inset-bottom));z-index:25;margin-top:-20px;position:relative}
   .handle{width:44px;height:5px;border-radius:3px;background:#dadce0;margin:4px auto 10px}
   .state{display:none}
   .state.on{display:block}
-
-  /* empty state */
   #stEmpty .hint{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:12px}
-  .btnrow{display:flex;gap:10px;align-items:center}
+  .btnrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pill{border:0;border-radius:26px;padding:14px 24px;font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
   .pill:active{transform:scale(.97)}
   .pill-teal{background:var(--teal);color:#fff}
-  .pill-light{background:#e8f0fe;color:#1a58c2}
   .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:11px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
-  label.pill, label.chip{user-select:none}
-
-  /* loaded state — like the Google route summary */
+  label.pill,label.chip{user-select:none}
   #stLoaded .big{font-size:28px;font-weight:800;letter-spacing:-.02em}
   #stLoaded .big .km{color:var(--muted);font-weight:700}
   #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 14px}
-  /* nav state */
-  #stNav{display:none;align-items:center;gap:14px}
+  #stNav{align-items:center;gap:14px}
   #stNav.on{display:flex}
   #stNav .eta-main{font-size:22px;font-weight:800;color:var(--ok)}
   #stNav .eta-sub{font-size:12px;color:var(--muted)}
@@ -104,6 +97,7 @@
 
 <div id="wrap">
   <div id="map"></div>
+  <div id="engineTag"></div>
 
   <div id="hud">
     <div class="arrow" id="hudArrow">&#8593;</div>
@@ -162,51 +156,158 @@
 
 <script>
 "use strict";
+const $=id=>document.getElementById(id);
+function toast(msg,ms=3500){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>$("toast").classList.remove("show"),ms);}
+window.onerror=m=>{toast("Hata: "+m,8000);};
 
-/* ═══════ State ═══════ */
-let map, posMarker=null, destMarker=null, chipMarker=null, mapReady=false;
+/* ═══════ App state ═══════ */
 let baseRoute=null, route=null;
 let navActive=false, watchId=null, simTimer=null, wakeLock=null;
 let voiceLang='tr';
 let nextTurnIdx=0, announced={}, arrivalSpoken=false, onMainSpoken=true;
 let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
-const BUS_AVG_KMH=22; // realistic city-bus average for estimates
-
-const $=id=>document.getElementById(id);
-
-/* ═══════ Map (MapLibre GL) ═══════ */
-map=new maplibregl.Map({
-  container:'map',
-  style:{version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap'}},layers:[{id:'osm',type:'raster',source:'osm'}]},
-  center:[9.73,52.35],zoom:12,attributionControl:true
-});
-map.on('load',()=>{
-  mapReady=true;
-  map.addSource('approach',{type:'geojson',data:emptyGeo()});
-  map.addSource('main',{type:'geojson',data:emptyGeo()});
-  map.addSource('startpt',{type:'geojson',data:emptyGeo()});
-  /* Google-style: dark navy casing + vivid blue fill, rounded */
-  map.addLayer({id:'approach-casing',type:'line',source:'approach',paint:{'line-color':'#2a3ac2','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
-  map.addLayer({id:'approach-line',type:'line',source:'approach',paint:{'line-color':'#4356f2','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
-  map.addLayer({id:'main-casing',type:'line',source:'main',paint:{'line-color':'#141414','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
-  map.addLayer({id:'main-line',type:'line',source:'main',paint:{'line-color':'#f7c600','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
-  map.addLayer({id:'startpt-circle',type:'circle',source:'startpt',paint:{'circle-radius':7,'circle-color':'#188038','circle-stroke-color':'#fff','circle-stroke-width':3}});
-});
-function emptyGeo(){return {type:'FeatureCollection',features:[]};}
-function lineFeature(pts){return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:pts.map(p=>[p.lng,p.lat])},properties:{}}]};}
-
-/* Any user gesture pauses follow — the map never snaps back */
-function pauseFollow(e){if(navActive&&e&&e.originalEvent){follow=false;$("recenter").classList.add("show");}}
-map.on('movestart',pauseFollow);
-map.on('rotatestart',pauseFollow);
-map.on('zoomstart',pauseFollow);
-$("recenter").onclick=()=>{follow=true;$("recenter").classList.remove("show");if(lastFix)cameraTo(lastFix,300);};
+const BUS_AVG_KMH=22;
+const TILE_SUBS=['a','b','c','d'];
+const TILE_URL=s=>`https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`;
 
 /* ═══════ Geometry ═══════ */
-const R=6371000,toRad=d=>d*Math.PI/180,toDeg=r=>r*180/Math.PI;
-function haversine(a,b){const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+const RE=6371000,toRad=d=>d*Math.PI/180,toDeg=r=>r*180/Math.PI;
+function haversine(a,b){const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;return 2*RE*Math.asin(Math.sqrt(s));}
 function bearing(a,b){const y=Math.sin(toRad(b.lng-a.lng))*Math.cos(toRad(b.lat));const x=Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat))-Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng-a.lng));return (toDeg(Math.atan2(y,x))+360)%360;}
 function angleDiff(b1,b2){let d=b2-b1;while(d>180)d-=360;while(d<-180)d+=360;return d;}
+
+/* ═══════════════════ MAP ADAPTER (dual engine) ═══════════════════ */
+let MAP=null;
+
+function glSupported(){
+  if(typeof maplibregl==="undefined")return false;
+  try{
+    const c=document.createElement('canvas');
+    if(!(c.getContext('webgl2')||c.getContext('webgl')))return false;
+    const w=new Worker(URL.createObjectURL(new Blob([''],{type:'application/javascript'})));
+    w.terminate();
+    return true;
+  }catch(e){return false;}
+}
+
+function makeEl(cls,html){const el=document.createElement('div');el.className=cls;if(html)el.innerHTML=html;return el;}
+
+/* ---- MapLibre GL backend: rotating map, smooth camera ---- */
+function initGL(){
+  const m=new maplibregl.Map({
+    container:'map',
+    style:{version:8,sources:{carto:{type:'raster',tiles:TILE_SUBS.map(TILE_URL),tileSize:256,attribution:'© OpenStreetMap © CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]},
+    center:[9.73,52.35],zoom:12
+  });
+  const A={engine:'gl',rotates:true,_m:m,_ready:false,_dest:null,_chip:null,_pos:null,_startM:null,_gestureCb:null};
+  m.on('load',()=>{
+    ['approach','main'].forEach(n=>m.addSource(n,{type:'geojson',data:{type:'FeatureCollection',features:[]}}));
+    m.addLayer({id:'approach-casing',type:'line',source:'approach',paint:{'line-color':'#2a3ac2','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
+    m.addLayer({id:'approach-line',type:'line',source:'approach',paint:{'line-color':'#4356f2','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
+    m.addLayer({id:'main-casing',type:'line',source:'main',paint:{'line-color':'#141414','line-width':11},layout:{'line-cap':'round','line-join':'round'}});
+    m.addLayer({id:'main-line',type:'line',source:'main',paint:{'line-color':'#f7c600','line-width':7},layout:{'line-cap':'round','line-join':'round'}});
+    A._ready=true;if(A._onReady)A._onReady();
+  });
+  const gest=e=>{if(e&&e.originalEvent&&A._gestureCb)A._gestureCb();};
+  m.on('movestart',gest);m.on('rotatestart',gest);m.on('zoomstart',gest);
+  A.ready=cb=>{A._ready?cb():A._onReady=cb;};
+  A.setRoute=(app,main)=>{
+    const lf=pts=>({type:'FeatureCollection',features:pts.length?[{type:'Feature',geometry:{type:'LineString',coordinates:pts.map(p=>[p.lng,p.lat])},properties:{}}]:[]});
+    m.getSource('approach').setData(lf(app));m.getSource('main').setData(lf(main));
+  };
+  A.setStart=p=>{if(A._startM){A._startM.remove();A._startM=null;}if(p)A._startM=new maplibregl.Marker({element:makeEl('start-dot'),anchor:'center'}).setLngLat([p.lng,p.lat]).addTo(m);};
+  A.setDest=p=>{if(A._dest){A._dest.remove();A._dest=null;}if(p)A._dest=new maplibregl.Marker({element:makeEl('dest-pin'),anchor:'bottom'}).setLngLat([p.lng,p.lat]).addTo(m);};
+  A.setChip=(p,text)=>{if(A._chip){A._chip.remove();A._chip=null;}if(p)A._chip=new maplibregl.Marker({element:makeEl('time-chip',text),anchor:'left',offset:[12,0]}).setLngLat([p.lng,p.lat]).addTo(m);};
+  A.posEnsure=(mode,p)=>{
+    if(A._pos&&A._posMode===mode)return;
+    const pos=A._pos?A._pos.getLngLat():(p?[p.lng,p.lat]:null);
+    if(A._pos)A._pos.remove();
+    A._pos=new maplibregl.Marker({element:makeEl(mode==='arrow'?'pos-arrow':'pos-dot'),rotationAlignment:mode==='arrow'?'map':'viewport',anchor:'center'});
+    A._posMode=mode;
+    if(pos){A._pos.setLngLat(pos).addTo(m);}
+  };
+  A.posSet=(p,heading)=>{if(!A._pos)return;A._pos.setLngLat([p.lng,p.lat]);if(A._posMode==='arrow'&&heading!=null)A._pos.setRotation(heading);};
+  A.posRemove=()=>{if(A._pos){A._pos.remove();A._pos=null;A._posMode=null;}};
+  A.camera=(p,heading,dur)=>{m.easeTo({center:[p.lng,p.lat],bearing:heading||0,duration:dur,easing:t=>t});};
+  A.setZoom=z=>m.easeTo({zoom:z,duration:600});
+  A.resetBearing=()=>m.easeTo({bearing:0,duration:500});
+  A.fitAll=pts=>{
+    let a=90,b=-90,c=180,d=-180;
+    pts.forEach(p=>{a=Math.min(a,p.lat);b=Math.max(b,p.lat);c=Math.min(c,p.lng);d=Math.max(d,p.lng);});
+    m.fitBounds([[c,a],[d,b]],{padding:70,duration:600});
+  };
+  A.easeCenter=(p,z)=>m.easeTo({center:[p.lng,p.lat],zoom:z,duration:800});
+  A.onGesture=cb=>{A._gestureCb=cb;};
+  return A;
+}
+
+/* ---- Leaflet backend: north-up, works everywhere (incl. restricted previews) ---- */
+function initLF(){
+  const m=L.map('map',{zoomControl:false}).setView([52.35,9.73],12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',{subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(m);
+  const A={engine:'leaflet',rotates:false,_m:m,_layers:[],_dest:null,_chip:null,_pos:null,_startM:null,_gestureCb:null,_prog:false};
+  const gest=()=>{if(!A._prog&&A._gestureCb)A._gestureCb();};
+  m.on('dragstart',gest);
+  m.on('zoomstart',()=>{if(!A._prog&&A._gestureCb)A._gestureCb();});
+  const prog=(fn,dur)=>{A._prog=true;fn();setTimeout(()=>A._prog=false,(dur||600)+80);};
+  A.ready=cb=>cb();
+  A.setRoute=(app,main)=>{
+    A._layers.forEach(l=>m.removeLayer(l));A._layers=[];
+    const add=(pts,casing,color)=>{
+      if(!pts.length)return;
+      const ll=pts.map(p=>[p.lat,p.lng]);
+      A._layers.push(L.polyline(ll,{color:casing,weight:11,lineCap:'round'}).addTo(m));
+      A._layers.push(L.polyline(ll,{color:color,weight:7,lineCap:'round'}).addTo(m));
+    };
+    add(app,'#2a3ac2','#4356f2');
+    add(main,'#141414','#f7c600');
+  };
+  const dm=(cls,html,anchor)=>L.divIcon({className:'',html:`<div class="${cls}">${html||''}</div>`,iconSize:null,iconAnchor:anchor});
+  A.setStart=p=>{if(A._startM){m.removeLayer(A._startM);A._startM=null;}if(p)A._startM=L.marker([p.lat,p.lng],{icon:dm('start-dot','',[7,7])}).addTo(m);};
+  A.setDest=p=>{if(A._dest){m.removeLayer(A._dest);A._dest=null;}if(p)A._dest=L.marker([p.lat,p.lng],{icon:dm('dest-pin','',[13,26])}).addTo(m);};
+  A.setChip=(p,text)=>{if(A._chip){m.removeLayer(A._chip);A._chip=null;}if(p)A._chip=L.marker([p.lat,p.lng],{icon:dm('time-chip',text,[-12,14])}).addTo(m);};
+  A.posEnsure=(mode,p)=>{
+    if(A._pos&&A._posMode===mode)return;
+    const pos=A._pos?A._pos.getLatLng():(p?L.latLng(p.lat,p.lng):null);
+    if(A._pos)m.removeLayer(A._pos);
+    A._pos=L.marker(pos||[0,0],{icon:dm(mode==='arrow'?'pos-arrow-outer':'pos-dot',mode==='arrow'?'<div class="pos-arrow"></div>':'',[12,14]),zIndexOffset:1000});
+    A._posMode=mode;
+    if(pos)A._pos.addTo(m);
+  };
+  A.posSet=(p,heading)=>{
+    if(!A._pos)return;
+    A._pos.setLatLng([p.lat,p.lng]);
+    if(A._posMode==='arrow'&&heading!=null){
+      const el=A._pos.getElement();
+      if(el){const inner=el.querySelector('.pos-arrow-outer')||el.firstChild;if(inner)inner.style.transform=`rotate(${heading}deg)`;}
+    }
+  };
+  A.posRemove=()=>{if(A._pos){m.removeLayer(A._pos);A._pos=null;A._posMode=null;}};
+  A.camera=(p,heading,dur)=>{prog(()=>m.panTo([p.lat,p.lng],{animate:true,duration:(dur||900)/1000,easeLinearity:1}),dur);};
+  A.setZoom=z=>prog(()=>m.setZoom(z),300);
+  A.resetBearing=()=>{};
+  A.fitAll=pts=>{prog(()=>m.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])),{padding:[70,70]}),600);};
+  A.easeCenter=(p,z)=>prog(()=>m.setView([p.lat,p.lng],z,{animate:true}),800);
+  A.onGesture=cb=>{A._gestureCb=cb;};
+  return A;
+}
+
+try{
+  if(glSupported()){MAP=initGL();}
+  else throw new Error("gl yok");
+}catch(e){
+  try{$("map").innerHTML="";MAP=initLF();}
+  catch(e2){
+    $("map").innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;padding:24px;text-align:center;color:#b3170b;font-weight:700">Harita motoru yüklenemedi. İnterneti kontrol et ya da sayfayı GitHub Pages üzerinden aç.</div>';
+  }
+}
+if(MAP){
+  $("engineTag").textContent=MAP.engine==='gl'?'motor: GL (dönen harita)':'motor: Leaflet (uyumluluk)';
+  MAP.onGesture(()=>{if(navActive){follow=false;$("recenter").classList.add("show");}});
+}
+$("recenter").onclick=()=>{follow=true;$("recenter").classList.remove("show");if(lastFix&&MAP)MAP.camera(lastFix,lastFix.heading,300);};
+
+/* ═══════ Route helpers ═══════ */
 function projectOnRoute(p){
   let best={s:0,d:Infinity};
   for(let i=0;i<route.pts.length-1;i++){
@@ -228,8 +329,6 @@ function pointAtS(r,s){
   const t=Math.max(0,Math.min(1,(s-r.cum[i-1])/seg));
   return {lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t};
 }
-
-/* ═══════ Parsing ═══════ */
 function parseFile(name,text){
   const dom=new DOMParser().parseFromString(text,"application/xml");
   if(dom.querySelector("parsererror"))throw new Error("Dosya okunamadı — geçerli bir KML/GPX değil.");
@@ -250,8 +349,6 @@ function parseFile(name,text){
   if(haversine(simp[simp.length-1],pts[pts.length-1])>1)simp.push(pts[pts.length-1]);
   return {name:routeName,pts:simp};
 }
-
-/* ═══════ Turn analysis ═══════ */
 function analyzeRoute(r){
   const pts=r.pts;r.cum=[0];
   for(let i=1;i<pts.length;i++)r.cum[i]=r.cum[i-1]+haversine(pts[i-1],pts[i]);
@@ -287,73 +384,40 @@ const PHRASES={
 const P=()=>PHRASES[voiceLang];
 function speak(text){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=voiceLang==="tr"?"tr-TR":"de-DE";speechSynthesis.speak(u);}catch(e){}}
 
-/* ═══════ UI helpers ═══════ */
-function toast(msg,ms=3500){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>$("toast").classList.remove("show"),ms);}
 function fmtDist(m){return m>=1000?(m/1000).toFixed(1).replace(".",",")+" km":Math.round(m/10)*10+" m";}
 function fmtTime(min){if(min<1)return "1 dk";if(min<60)return Math.round(min)+" dk";return Math.floor(min/60)+" sa "+Math.round(min%60)+" dk";}
 function setSheet(state){["stEmpty","stLoaded","stNav"].forEach(id=>$(id).classList.toggle("on",id===state));}
 
-/* ═══════ Route display ═══════ */
-function makeDomMarker(className,html){
-  const el=document.createElement('div');el.className=className;if(html)el.innerHTML=html;return el;
-}
+/* ═══════ Display ═══════ */
 function displayRoute(r){
-  if(!mapReady){map.once('load',()=>displayRoute(r));return;}
-  const ai=r.approachIdx||0;
-  map.getSource('approach').setData(ai>0?lineFeature(r.pts.slice(0,ai+1)):emptyGeo());
-  map.getSource('main').setData(lineFeature(r.pts.slice(ai)));
-  map.getSource('startpt').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[r.pts[ai].lng,r.pts[ai].lat]},properties:{}}]});
-
-  /* red destination pin (DOM marker, like Google) */
-  const end=r.pts[r.pts.length-1];
-  if(destMarker)destMarker.remove();
-  destMarker=new maplibregl.Marker({element:makeDomMarker('dest-pin'),anchor:'bottom'}).setLngLat([end.lng,end.lat]).addTo(map);
-
-  /* blue time chip at route midpoint */
-  const est=fmtTime((r.total/1000)/BUS_AVG_KMH*60);
-  const mid=pointAtS(r,r.total*0.5);
-  if(chipMarker)chipMarker.remove();
-  chipMarker=new maplibregl.Marker({element:makeDomMarker('time-chip','≈ '+est),anchor:'left',offset:[10,0]}).setLngLat([mid.lng,mid.lat]).addTo(map);
-
-  if(!navActive){
-    let minLat=90,maxLat=-90,minLng=180,maxLng=-180;
-    r.pts.forEach(p=>{minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLng=Math.min(minLng,p.lng);maxLng=Math.max(maxLng,p.lng);});
-    map.fitBounds([[minLng,minLat],[maxLng,maxLat]],{padding:70,duration:600});
-  }
-  $("routeName").textContent=r.name;
-  $("sumTime").textContent="≈ "+est;
-  $("sumDist").textContent=fmtDist(r.total);
-  $("sumSub").textContent=(voiceLang==="tr"?"Otobüs rotası · ":"Busroute · ")+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
-  if(!navActive)setSheet("stLoaded");
+  if(!MAP)return;
+  MAP.ready(()=>{
+    const ai=r.approachIdx||0;
+    MAP.setRoute(ai>0?r.pts.slice(0,ai+1):[],r.pts.slice(ai));
+    MAP.setStart(r.pts[ai]);
+    MAP.setDest(r.pts[r.pts.length-1]);
+    const est=fmtTime((r.total/1000)/BUS_AVG_KMH*60);
+    if(!navActive)MAP.setChip(pointAtS(r,r.total*0.5),"≈ "+est);
+    if(!navActive)MAP.fitAll(r.pts);
+    $("routeName").textContent=r.name;
+    $("sumTime").textContent="≈ "+est;
+    $("sumDist").textContent=fmtDist(r.total);
+    $("sumSub").textContent=(voiceLang==="tr"?"Otobüs rotası · ":"Busroute · ")+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
+    if(!navActive)setSheet("stLoaded");
+  });
 }
 
-/* ═══════ Marker & camera ═══════ */
-function setMarkerMode(mode){ // 'dot' | 'arrow'
-  const el=makeDomMarker(mode==='arrow'?'pos-arrow':'pos-dot');
-  const pos=posMarker?posMarker.getLngLat():null;
-  if(posMarker)posMarker.remove();
-  posMarker=new maplibregl.Marker({element:el,rotationAlignment:mode==='arrow'?'map':'viewport',anchor:'center'});
-  if(pos)posMarker.setLngLat(pos).addTo(map);
-}
-function ensureMarker(lat,lng,mode){
-  if(!posMarker){setMarkerMode(mode||'dot');posMarker.setLngLat([lng,lat]).addTo(map);}
-}
+/* ═══════ Nav core ═══════ */
 function moveMarkerSmooth(from,to,heading,dur=900){
   if(markerAnim)cancelAnimationFrame(markerAnim);
-  posMarker.setRotation(heading);
   const t0=performance.now();
   function step(t){
     const k=Math.min(1,(t-t0)/dur);
-    posMarker.setLngLat([from.lng+(to.lng-from.lng)*k,from.lat+(to.lat-from.lat)*k]);
+    MAP.posSet({lat:from.lat+(to.lat-from.lat)*k,lng:from.lng+(to.lng-from.lng)*k},heading);
     if(k<1)markerAnim=requestAnimationFrame(step);
   }
   markerAnim=requestAnimationFrame(step);
 }
-function cameraTo(fix,dur=900){
-  map.easeTo({center:[fix.lng,fix.lat],bearing:fix.heading||0,duration:dur,easing:t=>t});
-}
-
-/* ═══════ Nav core ═══════ */
 function updateHUD(remaining,turn){
   const hud=$("hud");hud.classList.add("on");
   if(!turn){$("hudArrow").innerHTML="&#127937;";$("hudDist").textContent=fmtDist(remaining);$("hudWhat").textContent=voiceLang==="tr"?"Hedef":"Ziel";return;}
@@ -372,15 +436,15 @@ function updateETA(proj){
   $("etaSpeed").textContent=Math.round(smoothSpeed*3.6);
 }
 function onPosition(lat,lng,speedMs,gpsHeading){
-  if(!navActive||!route)return;
+  if(!navActive||!route||!MAP)return;
   const prev=lastFix;
   let heading=gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1?gpsHeading:(prev?bearing(prev,{lat,lng}):0);
   if(prev&&haversine(prev,{lat,lng})<2)heading=prev.heading;
   const fix={lat,lng,heading,speed:speedMs};
   if(speedMs!=null&&isFinite(speedMs))smoothSpeed=smoothSpeed*.7+speedMs*.3;
-  ensureMarker(lat,lng,'arrow');
-  if(prev)moveMarkerSmooth(prev,fix,heading);else posMarker.setLngLat([lng,lat]);
-  if(follow)cameraTo(fix);
+  MAP.posEnsure('arrow',fix);
+  if(prev)moveMarkerSmooth(prev,fix,heading);else MAP.posSet(fix,heading);
+  if(follow)MAP.camera(fix,heading,900);
   lastFix=fix;
 
   const proj=projectOnRoute({lat,lng});
@@ -465,7 +529,7 @@ function buildCombined(approachPts,base){
 
 /* ═══════ Start / stop ═══════ */
 async function startNav(simulate=false){
-  if(!baseRoute)return;
+  if(!baseRoute||!MAP)return;
   if(!simulate){
     let here;
     $("btnGo").disabled=true;toast("Konum alınıyor…");
@@ -479,20 +543,19 @@ async function startNav(simulate=false){
       try{
         const appr=await fetchApproach(here,start);
         route=buildCombined(appr.pts,baseRoute);
-        displayRoute(route);
         if(appr.profile==="car")toast("Uyarı: otobüs profili ulaşılamadı, standart araç rotası kullanılıyor.",6000);
       }catch(e){toast("Başlangıç rotası alınamadı: "+e.message,6000);}
     }
   }else{
-    route=baseRoute;route.approachIdx=0;route.approachS=0;displayRoute(route);
+    route=baseRoute;route.approachIdx=0;route.approachS=0;
   }
   navActive=true;nextTurnIdx=0;announced={};arrivalSpoken=false;follow=true;lastFix=null;smoothSpeed=0;
   onMainSpoken=(route.approachS===0);
+  displayRoute(route);
+  MAP.setChip(null);
   $("recenter").classList.remove("show");
   setSheet("stNav");
-  setMarkerMode('arrow');
-  if(chipMarker){chipMarker.remove();chipMarker=null;} /* clear chip during nav — clean screen */
-  map.easeTo({zoom:17,duration:600});
+  MAP.setZoom(17);
   speak(route.approachS>0?P().approach:P().start);
   try{wakeLock=await navigator.wakeLock?.request("screen");}catch(e){}
   if(simulate){
@@ -520,15 +583,14 @@ function stopNav(finished=false){
   $("hud").classList.remove("on");
   $("recenter").classList.remove("show");
   $("stNav").classList.remove("offroute");
-  if(posMarker){posMarker.remove();posMarker=null;}
+  if(MAP){MAP.posRemove();MAP.resetBearing();}
   lastFix=null;
   if(!finished)speechSynthesis.cancel();
-  map.easeTo({bearing:0,duration:500});
   if(baseRoute){route=baseRoute;route.approachIdx=0;route.approachS=0;displayRoute(baseRoute);setSheet("stLoaded");}
   else setSheet("stEmpty");
 }
 
-/* ═══════ Load ═══════ */
+/* ═══════ Load & wiring ═══════ */
 function loadFromText(name,text){
   const r=parseFile(name,text);
   analyzeRoute(r);
@@ -567,14 +629,14 @@ document.body.addEventListener("drop",e=>{
 $("langTR").onclick=()=>{voiceLang="tr";$("langTR").classList.add("active");$("langDE").classList.remove("active");if(baseRoute)displayRoute(route);};
 $("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("langTR").classList.remove("active");if(baseRoute)displayRoute(route);};
 
-/* ═══════ First launch: location permission + blue dot ═══════ */
+/* First launch: permission + blue dot */
 (function initLocation(){
-  if(!navigator.geolocation)return;
+  if(!navigator.geolocation||!MAP)return;
   navigator.geolocation.getCurrentPosition(
     p=>{
-      const lat=p.coords.latitude,lng=p.coords.longitude;
-      if(!baseRoute)map.easeTo({center:[lng,lat],zoom:15,duration:800});
-      ensureMarker(lat,lng,'dot');
+      const fix={lat:p.coords.latitude,lng:p.coords.longitude};
+      if(!baseRoute)MAP.easeCenter(fix,15);
+      MAP.ready(()=>{MAP.posEnsure('dot',fix);MAP.posSet(fix,null);});
       toast("Konum izni verildi ✓");
     },
     err=>{if(err.code===1)toast("Konum izni verilmedi. Chrome'da adres çubuğundaki kilit simgesinden izin verebilirsin.",6000);},
