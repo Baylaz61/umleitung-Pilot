@@ -172,6 +172,7 @@ let voiceLang='tr';
 let nextTurnIdx=0, announced={}, arrivalSpoken=false, onMainSpoken=true;
 let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
 let offrouteSince=null, rerouting=false, lastReroute=0, simMode=false;
+let lastRaw=null, wrongWaySince=null;
 let profile='bus';
 const PROFILE_SPEED={bus:22,car:30,bike:15,walk:4.5}; // km/h estimates
 const PROFILE_LABEL={bus:{tr:"Otobüs rotası",de:"Busroute"},car:{tr:"Araba rotası",de:"Autoroute"},bike:{tr:"Bisiklet rotası",de:"Fahrradroute"},walk:{tr:"Yaya rotası",de:"Fußweg"}};
@@ -218,7 +219,10 @@ function initGL(){
     A._ready=true;if(A._onReady)A._onReady();
   });
   const gest=e=>{if(e&&e.originalEvent&&A._gestureCb)A._gestureCb();};
-  m.on('movestart',gest);m.on('rotatestart',gest);m.on('zoomstart',gest);
+  m.on('dragstart',gest);m.on('rotatestart',gest);
+  A._userZoom=false;
+  m.on('zoomstart',e=>{if(e&&e.originalEvent)A._userZoom=true;});
+  m.on('zoomend',()=>{A._userZoom=false;});
   A.ready=cb=>{A._ready?cb():A._onReady=cb;};
   A.setRoute=(app,main)=>{
     const lf=pts=>({type:'FeatureCollection',features:pts.length?[{type:'Feature',geometry:{type:'LineString',coordinates:pts.map(p=>[p.lng,p.lat])},properties:{}}]:[]});
@@ -247,6 +251,7 @@ function initGL(){
   };
   A.easeCenter=(p,z)=>m.easeTo({center:[p.lng,p.lat],zoom:z,duration:800});
   A.onGesture=cb=>{A._gestureCb=cb;};
+  A.userZooming=()=>A._userZoom;
   return A;
 }
 
@@ -257,7 +262,9 @@ function initLF(){
   const A={engine:'leaflet',rotates:false,_m:m,_layers:[],_dest:null,_chip:null,_pos:null,_startM:null,_gestureCb:null,_prog:false};
   const gest=()=>{if(!A._prog&&A._gestureCb)A._gestureCb();};
   m.on('dragstart',gest);
-  m.on('zoomstart',()=>{if(!A._prog&&A._gestureCb)A._gestureCb();});
+  A._userZoom=false;
+  m.on('zoomstart',()=>{if(!A._prog)A._userZoom=true;});
+  m.on('zoomend',()=>{A._userZoom=false;});
   const prog=(fn,dur)=>{A._prog=true;fn();setTimeout(()=>A._prog=false,(dur||600)+80);};
   A.ready=cb=>cb();
   A.setRoute=(app,main)=>{
@@ -298,6 +305,7 @@ function initLF(){
   A.fitAll=pts=>{prog(()=>m.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])),{padding:[70,70]}),600);};
   A.easeCenter=(p,z)=>prog(()=>m.setView([p.lat,p.lng],z,{animate:true}),800);
   A.onGesture=cb=>{A._gestureCb=cb;};
+  A.userZooming=()=>A._userZoom;
   return A;
 }
 
@@ -391,7 +399,19 @@ const PHRASES={
     onroute:"Sie sind jetzt auf der Umleitungsroute",reroute:"Route wird neu berechnet",turnR:"Rechts abbiegen",turnL:"Links abbiegen",toStart:"Zum Start",toEnd:"Zum Ziel"}
 };
 const P=()=>PHRASES[voiceLang];
-function speak(text){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=voiceLang==="tr"?"tr-TR":"de-DE";speechSynthesis.speak(u);}catch(e){}}
+function speak(text){
+  try{
+    speechSynthesis.cancel();
+    clearTimeout(speak._t);
+    speak._t=setTimeout(()=>{
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang=voiceLang==="tr"?"tr-TR":"de-DE";
+      u.rate=1.0;
+      try{speechSynthesis.resume();}catch(e){}
+      speechSynthesis.speak(u);
+    },250);
+  }catch(e){}
+}
 
 function fmtDist(m){return m>=1000?(m/1000).toFixed(1).replace(".",",")+" km":Math.round(m/10)*10+" m";}
 function fmtTime(min){if(min<1)return "1 dk";if(min<60)return Math.round(min)+" dk";return Math.floor(min/60)+" sa "+Math.round(min%60)+" dk";}
@@ -456,6 +476,9 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
   if(speedMs!=null&&isFinite(speedMs))smoothSpeed=smoothSpeed*.7+speedMs*.3;
 
   const raw={lat,lng};
+  const rawHeading=(gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1)?gpsHeading:
+                   (lastRaw&&haversine(lastRaw,raw)>3?bearing(lastRaw,raw):null);
+  lastRaw=raw;
   const proj=projectOnRoute(raw);
 
   /* ROTAYA MIKNATISLAMA: rotanın 30 m içindeysek imleci çizginin tam üstüne oturt,
@@ -478,7 +501,7 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
   const fix={lat:disp.lat,lng:disp.lng,heading,speed:speedMs};
   MAP.posEnsure('arrow',fix);
   if(prev)moveMarkerSmooth(prev,fix,heading);else MAP.posSet(fix,heading);
-  if(follow)MAP.camera(fix,heading,900);
+  if(follow&&!MAP.userZooming())MAP.camera(fix,heading,900);
   lastFix=fix;
 
   if(!onMainSpoken&&proj.s>=(route.approachS||0)){onMainSpoken=true;speak(P().onroute);}
@@ -490,6 +513,15 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
     maybeReroute(raw,proj);
     return;
   }else if(nav.classList.contains("offroute")){nav.classList.remove("offroute");offrouteSince=null;speak(P().back);}
+
+  /* TERS YÖN: rotanın üstünde ama akışa 120°+ ters gidiyorsan → yeni rota */
+  if(rawHeading!=null&&(speedMs==null||speedMs>2)){
+    const hdiff=Math.abs(angleDiff(rawHeading,routeBearingAt(Math.min(proj.s+8,route.total))));
+    if(hdiff>120){
+      if(!wrongWaySince)wrongWaySince=Date.now();
+      else if(Date.now()-wrongWaySince>6000){wrongWaySince=null;maybeReroute(raw,proj,true);}
+    }else wrongWaySince=null;
+  }else wrongWaySince=null;
 
   while(nextTurnIdx<route.turns.length&&route.turns[nextTurnIdx].s<proj.s-25)nextTurnIdx++;
   const turn=route.turns[nextTurnIdx]||null;
@@ -509,16 +541,18 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
 }
 
 /* ═══════ Otomatik yeniden rota (Google Maps gibi) ═══════ */
-async function maybeReroute(here,proj){
+async function maybeReroute(here,proj,force){
   if(simMode||rerouting||!navActive)return;
-  if(!offrouteSince||Date.now()-offrouteSince<8000)return;   // 8 sn sabır: kısa GPS sapmalarında boşuna hesaplama
-  if(Date.now()-lastReroute<20000)return;                    // en fazla 20 sn'de bir
+  if(!force&&(!offrouteSince||Date.now()-offrouteSince<5000))return; // 5 sn sabır
+  if(Date.now()-lastReroute<15000)return;                            // en fazla 15 sn'de bir
   rerouting=true;lastReroute=Date.now();
   speak(P().reroute);
   toast(voiceLang==="tr"?"Yeni rota hesaplanıyor…":"Route wird neu berechnet…");
   try{
     /* Rotaya İLERİDEN katıl: bulunduğun hizadan geriye değil, ileriye bağla */
-    const sRejoin=Math.min(Math.max(proj.s,route.approachS||0),route.total);
+    /* Bulunduğun hizanın 80 m İLERİSİNDEN katıl: ters yöndeysen router seni döndüren gerçek bir rota çizer,
+       aynı rotayı geri göstermez */
+    const sRejoin=Math.min(Math.max(proj.s+80,route.approachS||0),route.total);
     let idx=0;while(idx<route.cum.length&&route.cum[idx]<sRejoin)idx++;
     const remaining=[pointAtS(route,sRejoin)].concat(route.pts.slice(idx));
     if(remaining.length<2){rerouting=false;return;} // hedefe zaten çok yakın
@@ -526,7 +560,8 @@ async function maybeReroute(here,proj){
     route=buildCombined(appr.pts,{name:route.name,pts:remaining});
     nextTurnIdx=0;announced={};onMainSpoken=false;
     displayRoute(route);
-    $("stNav").classList.remove("offroute");offrouteSince=null;
+    $("stNav").classList.remove("offroute");offrouteSince=null;wrongWaySince=null;
+    toast(voiceLang==="tr"?"Yeni rota hazır ✓":"Neue Route bereit ✓");
   }catch(e){toast("Rota hesaplanamadı: "+e.message,5000);}
   rerouting=false;
 }
@@ -609,14 +644,14 @@ async function startNav(simulate=false){
   }else{
     route=baseRoute;route.approachIdx=0;route.approachS=0;
   }
-  navActive=true;simMode=simulate;offrouteSince=null;rerouting=false;lastReroute=0;
+  navActive=true;simMode=simulate;offrouteSince=null;rerouting=false;lastReroute=0;lastRaw=null;wrongWaySince=null;
   nextTurnIdx=0;announced={};arrivalSpoken=false;follow=true;lastFix=null;smoothSpeed=0;
   onMainSpoken=(route.approachS===0);
   displayRoute(route);
   MAP.setChip(null);
   $("recenter").classList.remove("show");
   setSheet("stNav");
-  MAP.setZoom(17);
+  MAP.setZoom(18);
   speak(route.approachS>0?P().approach:P().start);
   try{wakeLock=await navigator.wakeLock?.request("screen");}catch(e){}
   if(simulate){
