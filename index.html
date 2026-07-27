@@ -171,6 +171,7 @@ let navActive=false, watchId=null, simTimer=null, wakeLock=null;
 let voiceLang='tr';
 let nextTurnIdx=0, announced={}, arrivalSpoken=false, onMainSpoken=true;
 let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
+let offrouteSince=null, rerouting=false, lastReroute=0, simMode=false;
 let profile='bus';
 const PROFILE_SPEED={bus:22,car:30,bike:15,walk:4.5}; // km/h estimates
 const PROFILE_LABEL={bus:{tr:"Otobüs rotası",de:"Busroute"},car:{tr:"Araba rotası",de:"Autoroute"},bike:{tr:"Bisiklet rotası",de:"Fahrradroute"},walk:{tr:"Yaya rotası",de:"Fußweg"}};
@@ -383,11 +384,11 @@ const PHRASES={
   tr:{far:(m,d)=>`${m} metre sonra ${d==="R"?"sağa":"sola"} dönün`,now:d=>`Şimdi ${d==="R"?"sağa":"sola"} dönün`,sharp:d=>`keskin ${d==="R"?"sağ":"sol"}`,
     start:"Navigasyon başladı. Rotayı takip edin.",offroute:"Rotadan çıktınız",back:"Rotaya döndünüz",
     arrive:"Hedefe ulaştınız. Rota tamamlandı.",approach:"Önce Umleitung başlangıcına yönlendiriliyorsunuz",
-    onroute:"Umleitung rotasına girdiniz",turnR:"Sağa dön",turnL:"Sola dön",toStart:"Başlangıca",toEnd:"Hedefe"},
+    onroute:"Umleitung rotasına girdiniz",reroute:"Yeni rota hesaplanıyor",turnR:"Sağa dön",turnL:"Sola dön",toStart:"Başlangıca",toEnd:"Hedefe"},
   de:{far:(m,d)=>`In ${m} Metern ${d==="R"?"rechts":"links"} abbiegen`,now:d=>`Jetzt ${d==="R"?"rechts":"links"} abbiegen`,sharp:d=>`scharf ${d==="R"?"rechts":"links"}`,
     start:"Navigation gestartet. Folgen Sie der Route.",offroute:"Sie haben die Route verlassen",back:"Zurück auf der Route",
     arrive:"Sie haben Ihr Ziel erreicht.",approach:"Sie werden zuerst zum Beginn der Umleitung geführt",
-    onroute:"Sie sind jetzt auf der Umleitungsroute",turnR:"Rechts abbiegen",turnL:"Links abbiegen",toStart:"Zum Start",toEnd:"Zum Ziel"}
+    onroute:"Sie sind jetzt auf der Umleitungsroute",reroute:"Route wird neu berechnet",turnR:"Rechts abbiegen",turnL:"Links abbiegen",toStart:"Zum Start",toEnd:"Zum Ziel"}
 };
 const P=()=>PHRASES[voiceLang];
 function speak(text){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=voiceLang==="tr"?"tr-TR":"de-DE";speechSynthesis.speak(u);}catch(e){}}
@@ -485,9 +486,10 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
 
   const nav=$("stNav");
   if(proj.d>60){
-    if(!nav.classList.contains("offroute")){nav.classList.add("offroute");speak(P().offroute);}
+    if(!nav.classList.contains("offroute")){nav.classList.add("offroute");speak(P().offroute);offrouteSince=Date.now();}
+    maybeReroute(raw,proj);
     return;
-  }else if(nav.classList.contains("offroute")){nav.classList.remove("offroute");speak(P().back);}
+  }else if(nav.classList.contains("offroute")){nav.classList.remove("offroute");offrouteSince=null;speak(P().back);}
 
   while(nextTurnIdx<route.turns.length&&route.turns[nextTurnIdx].s<proj.s-25)nextTurnIdx++;
   const turn=route.turns[nextTurnIdx]||null;
@@ -504,6 +506,29 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
   if(rem<=320&&rem>220&&!a.has(300)){a.add(300);speak(P().far(300,turn.dir));}
   else if(rem<=120&&rem>60&&!a.has(100)){a.add(100);speak(P().far(100,turn.dir));}
   else if(rem<=45&&!a.has(0)){a.add(0);speak(P().now(turn.dir));}
+}
+
+/* ═══════ Otomatik yeniden rota (Google Maps gibi) ═══════ */
+async function maybeReroute(here,proj){
+  if(simMode||rerouting||!navActive)return;
+  if(!offrouteSince||Date.now()-offrouteSince<8000)return;   // 8 sn sabır: kısa GPS sapmalarında boşuna hesaplama
+  if(Date.now()-lastReroute<20000)return;                    // en fazla 20 sn'de bir
+  rerouting=true;lastReroute=Date.now();
+  speak(P().reroute);
+  toast(voiceLang==="tr"?"Yeni rota hesaplanıyor…":"Route wird neu berechnet…");
+  try{
+    /* Rotaya İLERİDEN katıl: bulunduğun hizadan geriye değil, ileriye bağla */
+    const sRejoin=Math.min(Math.max(proj.s,route.approachS||0),route.total);
+    let idx=0;while(idx<route.cum.length&&route.cum[idx]<sRejoin)idx++;
+    const remaining=[pointAtS(route,sRejoin)].concat(route.pts.slice(idx));
+    if(remaining.length<2){rerouting=false;return;} // hedefe zaten çok yakın
+    const appr=await fetchApproach(here,remaining[0]);
+    route=buildCombined(appr.pts,{name:route.name,pts:remaining});
+    nextTurnIdx=0;announced={};onMainSpoken=false;
+    displayRoute(route);
+    $("stNav").classList.remove("offroute");offrouteSince=null;
+  }catch(e){toast("Rota hesaplanamadı: "+e.message,5000);}
+  rerouting=false;
 }
 
 /* ═══════ Location & bus routing ═══════ */
@@ -584,7 +609,8 @@ async function startNav(simulate=false){
   }else{
     route=baseRoute;route.approachIdx=0;route.approachS=0;
   }
-  navActive=true;nextTurnIdx=0;announced={};arrivalSpoken=false;follow=true;lastFix=null;smoothSpeed=0;
+  navActive=true;simMode=simulate;offrouteSince=null;rerouting=false;lastReroute=0;
+  nextTurnIdx=0;announced={};arrivalSpoken=false;follow=true;lastFix=null;smoothSpeed=0;
   onMainSpoken=(route.approachS===0);
   displayRoute(route);
   MAP.setChip(null);
