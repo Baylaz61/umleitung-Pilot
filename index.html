@@ -41,9 +41,7 @@
   #recenter .dot{width:16px;height:16px;border-radius:50%;background:#1a73e8;box-shadow:0 0 0 5px #d2e3fc}
 
   .pos-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)}
-  .pos-arrow-outer{width:24px;height:28px}
-  .pos-arrow{width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:28px solid #1a73e8;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45));position:relative}
-  .pos-arrow::after{content:"";position:absolute;left:-8px;top:9px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:17px solid #fff}
+  .pos-wrap{width:30px;height:30px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))}
   .dest-pin{width:26px;height:26px;background:var(--red);border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #b3170b;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.35)}
   .dest-pin::after{content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#7a0f06}
   .start-dot{width:15px;height:15px;border-radius:50%;background:var(--ok);border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
@@ -63,6 +61,7 @@
   .pill-teal{background:var(--teal);color:#fff}
   .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:11px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
   label.pill,label.chip{user-select:none}
+  .pchip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
   #stLoaded .big{font-size:28px;font-weight:800;letter-spacing:-.02em}
   #stLoaded .big .km{color:var(--muted);font-weight:700}
   #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 14px}
@@ -134,6 +133,12 @@
   <div class="state" id="stLoaded">
     <div class="big"><span id="sumTime">–</span> <span class="km">(<span id="sumDist">–</span>)</span></div>
     <div class="subtitle" id="sumSub">Umleitung rotası</div>
+    <div class="btnrow" id="profileRow" style="margin-bottom:12px">
+      <button class="chip pchip active" data-p="bus">&#128652; Otobüs</button>
+      <button class="chip pchip" data-p="car">&#128663; Araba</button>
+      <button class="chip pchip" data-p="bike">&#128690; Bisiklet</button>
+      <button class="chip pchip" data-p="walk">&#128694; Yaya</button>
+    </div>
     <div class="btnrow">
       <button class="pill pill-teal" id="btnGo">&#9650; Başlat</button>
       <button class="chip" id="btnSim">SİM test</button>
@@ -166,7 +171,10 @@ let navActive=false, watchId=null, simTimer=null, wakeLock=null;
 let voiceLang='tr';
 let nextTurnIdx=0, announced={}, arrivalSpoken=false, onMainSpoken=true;
 let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
-const BUS_AVG_KMH=22;
+let profile='bus';
+const PROFILE_SPEED={bus:22,car:30,bike:15,walk:4.5}; // km/h estimates
+const PROFILE_LABEL={bus:{tr:"Otobüs rotası",de:"Busroute"},car:{tr:"Araba rotası",de:"Autoroute"},bike:{tr:"Bisiklet rotası",de:"Fahrradroute"},walk:{tr:"Yaya rotası",de:"Fußweg"}};
+const ARROW_SVG='<svg width="30" height="30" viewBox="0 0 30 30"><path d="M15 2 L26 26 L15 19.5 L4 26 Z" fill="#1a73e8" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>';
 const TILE_SUBS=['a','b','c','d'];
 const TILE_URL=s=>`https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`;
 
@@ -222,7 +230,7 @@ function initGL(){
     if(A._pos&&A._posMode===mode)return;
     const pos=A._pos?A._pos.getLngLat():(p?[p.lng,p.lat]:null);
     if(A._pos)A._pos.remove();
-    A._pos=new maplibregl.Marker({element:makeEl(mode==='arrow'?'pos-arrow':'pos-dot'),rotationAlignment:mode==='arrow'?'map':'viewport',anchor:'center'});
+    A._pos=new maplibregl.Marker({element:makeEl(mode==='arrow'?'pos-wrap':'pos-dot',mode==='arrow'?ARROW_SVG:''),rotationAlignment:mode==='arrow'?'map':'viewport',anchor:'center'});
     A._posMode=mode;
     if(pos){A._pos.setLngLat(pos).addTo(m);}
   };
@@ -270,7 +278,7 @@ function initLF(){
     if(A._pos&&A._posMode===mode)return;
     const pos=A._pos?A._pos.getLatLng():(p?L.latLng(p.lat,p.lng):null);
     if(A._pos)m.removeLayer(A._pos);
-    A._pos=L.marker(pos||[0,0],{icon:dm(mode==='arrow'?'pos-arrow-outer':'pos-dot',mode==='arrow'?'<div class="pos-arrow"></div>':'',[12,14]),zIndexOffset:1000});
+    A._pos=L.marker(pos||[0,0],{icon:dm(mode==='arrow'?'pos-wrap':'pos-dot',mode==='arrow'?ARROW_SVG:'',mode==='arrow'?[15,15]:[9,9]),zIndexOffset:1000});
     A._posMode=mode;
     if(pos)A._pos.addTo(m);
   };
@@ -279,7 +287,7 @@ function initLF(){
     A._pos.setLatLng([p.lat,p.lng]);
     if(A._posMode==='arrow'&&heading!=null){
       const el=A._pos.getElement();
-      if(el){const inner=el.querySelector('.pos-arrow-outer')||el.firstChild;if(inner)inner.style.transform=`rotate(${heading}deg)`;}
+      if(el){const inner=el.querySelector('.pos-wrap');if(inner)inner.style.transform=`rotate(${heading}deg)`;}
     }
   };
   A.posRemove=()=>{if(A._pos){m.removeLayer(A._pos);A._pos=null;A._posMode=null;}};
@@ -396,13 +404,13 @@ function displayRoute(r){
     MAP.setRoute(ai>0?r.pts.slice(0,ai+1):[],r.pts.slice(ai));
     MAP.setStart(r.pts[ai]);
     MAP.setDest(r.pts[r.pts.length-1]);
-    const est=fmtTime((r.total/1000)/BUS_AVG_KMH*60);
+    const est=fmtTime((r.total/1000)/PROFILE_SPEED[profile]*60);
     if(!navActive)MAP.setChip(pointAtS(r,r.total*0.5),"≈ "+est);
     if(!navActive)MAP.fitAll(r.pts);
     $("routeName").textContent=r.name;
     $("sumTime").textContent="≈ "+est;
     $("sumDist").textContent=fmtDist(r.total);
-    $("sumSub").textContent=(voiceLang==="tr"?"Otobüs rotası · ":"Busroute · ")+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
+    $("sumSub").textContent=PROFILE_LABEL[profile][voiceLang]+" · "+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
     if(!navActive)setSheet("stLoaded");
   });
 }
@@ -429,25 +437,49 @@ function updateETA(proj){
   const inApproach=(route.approachS||0)>0&&proj.s<route.approachS;
   const target=inApproach?route.approachS:route.total;
   const rem=Math.max(0,target-proj.s);
-  const spd=Math.max(smoothSpeed,BUS_AVG_KMH/3.6);
+  const spd=Math.max(smoothSpeed,PROFILE_SPEED[profile]/3.6);
   $("etaPhase").textContent=inApproach?P().toStart:P().toEnd;
   $("etaTime").textContent=fmtTime(rem/spd/60);
   $("etaDist").textContent=fmtDist(rem);
   $("etaSpeed").textContent=Math.round(smoothSpeed*3.6);
 }
-function onPosition(lat,lng,speedMs,gpsHeading){
+function routeBearingAt(s){
+  let i=1;while(i<route.cum.length&&route.cum[i]<s)i++;
+  i=Math.min(i,route.pts.length-1);
+  return bearing(route.pts[i-1],route.pts[i]);
+}
+function onPosition(lat,lng,speedMs,gpsHeading,acc){
   if(!navActive||!route||!MAP)return;
-  const prev=lastFix;
-  let heading=gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1?gpsHeading:(prev?bearing(prev,{lat,lng}):0);
-  if(prev&&haversine(prev,{lat,lng})<2)heading=prev.heading;
-  const fix={lat,lng,heading,speed:speedMs};
+  /* kalitesiz GPS ölçümünü at (ilk fix hariç) */
+  if(acc!=null&&isFinite(acc)&&acc>35&&lastFix)return;
   if(speedMs!=null&&isFinite(speedMs))smoothSpeed=smoothSpeed*.7+speedMs*.3;
+
+  const raw={lat,lng};
+  const proj=projectOnRoute(raw);
+
+  /* ROTAYA MIKNATISLAMA: rotanın 30 m içindeysek imleci çizginin tam üstüne oturt,
+     yönü GPS'ten değil yolun kendisinden al — sola kayma ve titreme biter */
+  let disp,heading;
+  if(proj.d<=30){
+    disp=pointAtS(route,Math.min(proj.s+1,route.total));
+    heading=routeBearingAt(Math.min(proj.s+8,route.total));
+  }else{
+    disp=raw;
+    heading=gpsHeading!=null&&isFinite(gpsHeading)&&(speedMs||0)>1?gpsHeading:(lastFix?bearing(lastFix,raw):0);
+  }
+
+  const prev=lastFix;
+  /* TİTREME FİLTRESİ: 3 m'den az kıpırdama + durma hızı → imleç yerinden oynamaz */
+  if(prev&&haversine(prev,disp)<3&&(speedMs==null||speedMs<1.5)){
+    updateETA(proj);
+    return;
+  }
+  const fix={lat:disp.lat,lng:disp.lng,heading,speed:speedMs};
   MAP.posEnsure('arrow',fix);
   if(prev)moveMarkerSmooth(prev,fix,heading);else MAP.posSet(fix,heading);
   if(follow)MAP.camera(fix,heading,900);
   lastFix=fix;
 
-  const proj=projectOnRoute({lat,lng});
   if(!onMainSpoken&&proj.s>=(route.approachS||0)){onMainSpoken=true;speak(P().onroute);}
   updateETA(proj);
 
@@ -498,23 +530,26 @@ function decodePolyline(str,precision){
   return coords;
 }
 async function fetchApproach(from,to){
+  const costing={bus:"bus",car:"auto",bike:"bicycle",walk:"pedestrian"}[profile];
   try{
     const body={locations:[{lat:from.lat,lon:from.lng},{lat:to.lat,lon:to.lng}],
-      costing:"bus",costing_options:{bus:{width:2.55,height:3.4,length:12.0}},
+      costing:costing,
+      costing_options:profile==="bus"?{bus:{width:2.55,height:3.4,length:12.0}}:{},
       directions_options:{units:"kilometers"}};
     const res=await fetch("https://valhalla1.openstreetmap.de/route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     if(!res.ok)throw new Error("Valhalla "+res.status);
     const data=await res.json();
     const shape=data.trip&&data.trip.legs&&data.trip.legs[0].shape;
     if(!shape)throw new Error("Rota bulunamadı");
-    return {pts:decodePolyline(shape,6),profile:"bus"};
+    return {pts:decodePolyline(shape,6),profile:costing};
   }catch(e){
-    const url=`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    const osrm={bus:"routed-car",car:"routed-car",bike:"routed-bike",walk:"routed-foot"}[profile];
+    const url=`https://routing.openstreetmap.de/${osrm}/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
     const res=await fetch(url);
     if(!res.ok)throw new Error("Rota servisi cevap vermedi");
     const data=await res.json();
     if(!data.routes||!data.routes.length)throw new Error("Başlangıca rota bulunamadı");
-    return {pts:data.routes[0].geometry.coordinates.map(c=>({lat:c[1],lng:c[0]})),profile:"car"};
+    return {pts:data.routes[0].geometry.coordinates.map(c=>({lat:c[1],lng:c[0]})),profile:"fallback"};
   }
 }
 function buildCombined(approachPts,base){
@@ -539,11 +574,11 @@ async function startNav(simulate=false){
     const start=baseRoute.pts[0];
     route=baseRoute;route.approachIdx=0;route.approachS=0;
     if(haversine(here,start)>120){
-      toast("Otobüs rotası hesaplanıyor (2,55 m genişlik)…");
+      toast(profile==="bus"?"Otobüs rotası hesaplanıyor (2,55 m genişlik)…":PROFILE_LABEL[profile][voiceLang]+" hesaplanıyor…");
       try{
         const appr=await fetchApproach(here,start);
         route=buildCombined(appr.pts,baseRoute);
-        if(appr.profile==="car")toast("Uyarı: otobüs profili ulaşılamadı, standart araç rotası kullanılıyor.",6000);
+        if(appr.profile==="fallback"&&profile==="bus")toast("Uyarı: otobüs profili ulaşılamadı, standart araç rotası kullanılıyor.",6000);
       }catch(e){toast("Başlangıç rotası alınamadı: "+e.message,6000);}
     }
   }else{
@@ -569,7 +604,7 @@ async function startNav(simulate=false){
     toast("Simülasyon — sanal test sürüşü");
   }else{
     watchId=navigator.geolocation.watchPosition(
-      p=>onPosition(p.coords.latitude,p.coords.longitude,p.coords.speed,p.coords.heading),
+      p=>onPosition(p.coords.latitude,p.coords.longitude,p.coords.speed,p.coords.heading,p.coords.accuracy),
       err=>toast("Konum alınamadı: "+err.message,5000),
       {enableHighAccuracy:true,maximumAge:1000,timeout:15000});
   }
@@ -625,6 +660,13 @@ document.body.addEventListener("drop",e=>{
   const reader=new FileReader();
   reader.onload=()=>{try{loadFromText(f.name,reader.result);}catch(err){toast("Hata: "+err.message,5000);}};
   reader.readAsText(f);
+});
+document.querySelectorAll(".pchip").forEach(b=>{
+  b.onclick=()=>{
+    profile=b.dataset.p;
+    document.querySelectorAll(".pchip").forEach(x=>x.classList.toggle("active",x===b));
+    if(baseRoute)displayRoute(route); // tahmini süreyi yeni profile göre güncelle
+  };
 });
 $("langTR").onclick=()=>{voiceLang="tr";$("langTR").classList.add("active");$("langDE").classList.remove("active");if(baseRoute)displayRoute(route);};
 $("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("langTR").classList.remove("active");if(baseRoute)displayRoute(route);};
