@@ -78,22 +78,25 @@
   #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:60;background:#1c1e21;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
   #toast.show{opacity:1}
 
-  #sheet{flex-shrink:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.12);padding:8px 18px 14px;padding-bottom:calc(14px + env(safe-area-inset-bottom));z-index:25;margin-top:-20px;position:relative}
-  .handle{width:44px;height:5px;border-radius:3px;background:#dadce0;margin:4px auto 10px}
+  #sheet{flex-shrink:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.12);padding:6px 16px 10px;padding-bottom:calc(10px + env(safe-area-inset-bottom));z-index:25;margin-top:-20px;position:relative}
+  .handle{width:44px;height:5px;border-radius:3px;background:#dadce0;margin:3px auto 8px}
   .state{display:none}
   .state.on{display:block}
   #stEmpty .hint{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:12px}
-  .btnrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .pill{border:0;border-radius:26px;padding:14px 24px;font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+  .btnrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #profileRow{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px 10px;padding:0 16px;scrollbar-width:none}
+  #profileRow::-webkit-scrollbar{display:none}
+  #profileRow .pchip{flex:0 0 auto}
+  .pill{border:0;border-radius:26px;padding:13px 22px;font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
   .pill:active{transform:scale(.97)}
   .pill-teal{background:var(--teal);color:#fff}
-  .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:11px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:9px 13px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
   label.pill,label.chip{user-select:none}
   .pchip.active{background:var(--gblue);color:#fff;border-color:var(--gblue)}
-  #stLoaded .big{font-size:28px;font-weight:800;letter-spacing:-.02em}
+  #stLoaded .big{font-size:24px;font-weight:800;letter-spacing:-.02em}
   #stLoaded .big .km{color:var(--muted);font-weight:700}
-  #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 10px}
-  #busOk{color:var(--ok);font-weight:700;font-size:13px;margin:0 0 12px}
+  #stLoaded .subtitle{color:var(--muted);font-size:12px;margin:1px 0 6px}
+  #busOk{color:var(--ok);font-weight:700;font-size:12px;margin:0 0 8px}
   .set{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px}
   .set input{width:92px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;text-align:right}
   #stNav{align-items:center;gap:18px}
@@ -202,10 +205,10 @@
       <input id="addrInput" placeholder="&#128269; Adres ara (ör. Kochstraße 11 Hannover)" style="width:100%;border:1px solid var(--line);border-radius:24px;padding:14px 18px;font:inherit;font-size:15px">
       <div id="addrResults" style="display:none;position:absolute;top:52px;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:220px;overflow:auto;z-index:70"></div>
     </div>
-    <div class="hint" style="font-size:12px">Adres yaz → otobüs uyumlu rota. Ya da Umleitung <b>KML/GPX</b> dosyanı yükle.</div>
+    <div class="hint" style="font-size:11px;margin-bottom:8px">Adres yaz → otobüs rotası · veya Umleitung <b>KML/GPX</b> yükle</div>
     <div class="btnrow">
-      <label class="pill pill-teal" for="fileInput">&#128194; Dosya</label>
-      <button class="chip" id="btnPaste">&#128203; Yapıştır</button>
+      <label class="pill pill-teal" for="fileInput" style="flex:1">&#128194; Dosya Yükle</label>
+      <button class="chip" id="btnPaste">&#128203;</button>
     </div>
   </div>
 
@@ -213,16 +216,16 @@
     <div class="big"><span id="sumTime">–</span> <span class="km">(<span id="sumDist">–</span>)</span></div>
     <div class="subtitle" id="sumSub">Umleitung rotası</div>
     <div id="busOk">&#10003; Otobüs uyumlu rota</div>
-    <div class="btnrow" id="profileRow" style="margin-bottom:12px">
+    <div class="btnrow" id="profileRow">
       <button class="chip pchip active" data-p="bus">&#128652; Otobüs</button>
       <button class="chip pchip" data-p="car">&#128663; Araba</button>
       <button class="chip pchip" data-p="bike">&#128690; Bisiklet</button>
       <button class="chip pchip" data-p="walk">&#128694; Yaya</button>
     </div>
     <div class="btnrow">
-      <button class="pill pill-teal" id="btnGo">&#9650; Başlat</button>
-      <button class="chip" id="btnSim">SİM test</button>
-      <label class="chip" for="fileInput">Yeni dosya</label>
+      <button class="pill pill-teal" id="btnGo" style="flex:1">&#9650; Başlat</button>
+      <button class="chip" id="btnSim">SİM</button>
+      <label class="chip" for="fileInput">&#128194;</label>
     </div>
   </div>
 
