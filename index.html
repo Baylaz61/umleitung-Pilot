@@ -6,17 +6,18 @@
 <title>Umleitung Pilot</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.12.0/maplibre-gl.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
-    --sign:#f7c600; --sign-ink:#141414;
-    --line:#e3e5e8; --text:#1c1e21; --muted:#70757a;
-    --gblue:#4356f2; --teal:#0b7d75; --red:#ea4335; --ok:#188038;
+    --sign:#f7c600; --sign-ink:#141414;          /* Umleitung sarısı — dokunulmaz */
+    --surface:#f7f9ff; --line:#c1c6d6; --text:#181c20; --muted:#414754;
+    --gblue:#1a73e8; --primary:#005bbf; --teal:#00838f; --red:#ba1a1a; --ok:#006e2c;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
-  body{font-family:'Google Sans',system-ui,-apple-system,Roboto,sans-serif;background:#f2f3f5;color:var(--text);display:flex;flex-direction:column;overflow:hidden}
+  body{font-family:'Inter',system-ui,-apple-system,Roboto,sans-serif;background:var(--surface);color:var(--text);display:flex;flex-direction:column;overflow:hidden}
 
   header{display:flex;align-items:center;gap:10px;padding:7px 12px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0;z-index:20}
   .logo{background:var(--sign);color:var(--sign-ink);font-weight:900;padding:3px 8px;border-radius:4px;border:2px solid var(--sign-ink);font-size:12px;text-transform:uppercase}
@@ -30,11 +31,12 @@
   #map{position:absolute;inset:0;background:#e8eaed}
   #engineTag{position:absolute;left:8px;bottom:4px;z-index:29;font-size:9px;color:#9aa0a6;background:rgba(255,255,255,.7);padding:1px 5px;border-radius:4px}
 
-  #hud{display:none;position:absolute;top:10px;left:10px;z-index:30;background:var(--ok);color:#fff;border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:7px 12px;align-items:center;gap:9px}
+  #hud{display:none;position:absolute;top:10px;left:10px;right:10px;z-index:30;background:var(--ok);color:#fff;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.3);padding:12px 16px;align-items:center;gap:14px}
   #hud.on{display:flex}
-  #hud .arrow{font-size:22px;line-height:1;font-weight:900}
-  #hud .dist{font-size:16px;font-weight:800;white-space:nowrap;line-height:1.1}
-  #hud .what{font-size:10px;font-weight:600;opacity:.9;white-space:nowrap}
+  #hud .dist{font-size:26px;font-weight:800;white-space:nowrap;line-height:1;min-width:76px;text-align:center}
+  #hud .arrow{font-size:30px;line-height:1;font-weight:900}
+  #hud .what{font-size:19px;font-weight:800;line-height:1.2}
+  #hud .sub{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85;margin-top:2px}
 
   #recenter{display:none;position:absolute;right:12px;bottom:14px;z-index:30;width:52px;height:52px;border-radius:50%;background:#fff;border:0;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;align-items:center;justify-content:center}
   #recenter.show{display:flex}
@@ -47,6 +49,32 @@
   .start-dot{width:15px;height:15px;border-radius:50%;background:var(--ok);border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
   .time-chip{background:var(--gblue);color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap}
 
+  /* Hava durumu pill (üst bar) */
+  #wxpill{display:none;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer}
+  #wxpill.on{display:inline-flex}
+  /* Hız kutusu (sol alt) */
+  #speedbox{display:none;position:absolute;left:12px;bottom:14px;z-index:30;flex-direction:column;align-items:center;gap:6px}
+  #speedbox.on{display:flex}
+  #curspeed{background:#fff;border:1px solid var(--line);border-radius:14px;width:66px;height:66px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  #curspeed b{font-size:24px;font-weight:800;line-height:1}
+  #curspeed span{font-size:9px;color:var(--muted);font-weight:600}
+  #speedlimit{width:52px;height:52px;border-radius:50%;background:#fff;border:5px solid var(--red);display:none;align-items:center;justify-content:center;font-size:20px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  #speedlimit.on{display:flex}
+  #speedlimit.over{animation:flashred .6s infinite}
+  @keyframes flashred{0%,100%{background:#fff;color:var(--text)}50%{background:var(--red);color:#fff}}
+  /* Engel yaklaşma bandı (turuncu) */
+  #hazbar{display:none;position:absolute;top:74px;left:10px;right:10px;z-index:31;background:#e8730c;color:#fff;border-radius:12px;padding:9px 14px;font-weight:800;font-size:14px;box-shadow:0 3px 10px rgba(0,0,0,.3);align-items:center;gap:9px}
+  #hazbar.on{display:flex}
+  /* Engel bildirme butonu (sağ) */
+  #btnHazard{display:none;position:absolute;right:12px;top:74px;z-index:30;width:52px;height:52px;border-radius:50%;background:#e8730c;color:#fff;border:0;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:24px;cursor:pointer;align-items:center;justify-content:center}
+  #btnHazard.on{display:flex}
+  .haz-icon{font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));cursor:pointer}
+  /* Modal ortak */
+  .sheet-modal{display:none;position:absolute;inset:0;z-index:85;background:var(--surface);padding:18px;flex-direction:column;gap:12px;overflow:auto}
+  .wxrow{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .tip{background:#fff3e0;border-left:4px solid #e8730c;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;color:#7a3e00;margin-top:4px}
+  .hazbtn{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;font-weight:700;font-size:15px;cursor:pointer;width:100%}
+  .hazbtn:active{transform:scale(.98)}
   #toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:60;background:#1c1e21;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
   #toast.show{opacity:1}
 
@@ -61,15 +89,19 @@
   .pill-teal{background:var(--teal);color:#fff}
   .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:11px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
   label.pill,label.chip{user-select:none}
-  .pchip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .pchip.active{background:var(--gblue);color:#fff;border-color:var(--gblue)}
   #stLoaded .big{font-size:28px;font-weight:800;letter-spacing:-.02em}
   #stLoaded .big .km{color:var(--muted);font-weight:700}
-  #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 14px}
-  #stNav{align-items:center;gap:14px}
+  #stLoaded .subtitle{color:var(--muted);font-size:13px;margin:2px 0 10px}
+  #busOk{color:var(--ok);font-weight:700;font-size:13px;margin:0 0 12px}
+  .set{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px}
+  .set input{width:92px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;text-align:right}
+  #stNav{align-items:center;gap:18px}
   #stNav.on{display:flex}
-  #stNav .eta-main{font-size:22px;font-weight:800;color:var(--ok)}
-  #stNav .eta-sub{font-size:12px;color:var(--muted)}
-  #stNav .phase{font-size:11px;font-weight:800;color:var(--gblue);text-transform:uppercase;letter-spacing:.04em}
+  #stNav .stat b{display:block;font-size:24px;font-weight:800;line-height:1.05;color:var(--text)}
+  #stNav .stat span{font-size:11px;color:var(--muted);font-weight:600}
+  #stNav .stat.speed b{color:var(--gblue)}
+  #stNav .phase{font-size:11px;font-weight:800;color:var(--gblue);text-transform:uppercase;letter-spacing:.06em}
   #stNav.offroute .phase{color:var(--red)}
   #stNav .spacer{flex:1}
   .btn-x{width:52px;height:52px;border-radius:50%;border:0;background:#fce8e6;color:var(--red);font-size:22px;font-weight:900;cursor:pointer}
@@ -92,6 +124,8 @@
     <button id="langTR" class="active">TR</button>
     <button id="langDE">DE</button>
   </div>
+  <div id="wxpill">&#9925; <span id="wxtemp">–</span></div>
+  <button id="btnSettings" class="chip" style="padding:7px 11px;font-size:15px">&#9881;</button>
 </header>
 
 <div id="wrap">
@@ -99,15 +133,56 @@
   <div id="engineTag"></div>
 
   <div id="hud">
+    <div class="dist" id="hudDist">–</div>
     <div class="arrow" id="hudArrow">&#8593;</div>
-    <div>
-      <div class="dist" id="hudDist">–</div>
+    <div style="flex:1;min-width:0">
       <div class="what" id="hudWhat">–</div>
+      <div class="sub" id="hudSub"></div>
     </div>
   </div>
 
+  <div id="hazbar"><span id="hazbarIcon">&#128679;</span> <span id="hazbarText">–</span></div>
+  <button id="btnHazard" title="Engel bildir">&#9888;</button>
+  <div id="speedbox">
+    <div id="speedlimit">50</div>
+    <div id="curspeed"><b id="curspeedVal">0</b><span>km/h</span></div>
+  </div>
   <button id="recenter" title="Konuma dön"><span class="dot"></span></button>
   <div id="toast"></div>
+
+  <div id="settingsModal" style="display:none;position:absolute;inset:0;z-index:85;background:var(--surface);padding:18px;flex-direction:column;gap:12px;overflow:auto">
+    <div style="font-weight:800;font-size:18px">Araç Profili</div>
+    <label class="set">Genişlik (m)<input id="setW" type="number" step="0.01" min="1.5" max="3" value="2.55"></label>
+    <label class="set">Yükseklik (m)<input id="setH" type="number" step="0.1" min="2" max="4.5" value="3.4"></label>
+    <label class="set">Uzunluk (m)<input id="setL" type="number" step="0.5" min="6" max="25" value="12"></label>
+    <label class="set">Ağırlık (t)<input id="setWt" type="number" step="0.5" min="3" max="30" value="18"></label>
+    <div style="color:var(--muted);font-size:12px;line-height:1.4">Solobus ≈ 12 m · Gelenkbus ≈ 18 m. Bu değerler otobüs rotası hesabına doğrudan gider.</div>
+    <div style="background:#ffdad6;border-left:4px solid var(--red);border-radius:8px;padding:10px 12px;color:#93000a;font-size:12px;font-weight:600">Genişlik kısıtı OpenStreetMap verisine dayanır; %100 garanti değildir, şoför sorumluluğu devam eder.</div>
+    <button class="pill pill-teal" id="setOk">Kaydet</button>
+    <div style="color:var(--muted);font-size:11px;text-align:center">Umleitung Pilot</div>
+  </div>
+
+  <div id="wxModal" class="sheet-modal">
+    <div style="font-weight:800;font-size:18px">Sürüş Emniyeti</div>
+    <div style="font-size:44px;text-align:center" id="wxBigIcon">&#9925;</div>
+    <div style="text-align:center;font-size:28px;font-weight:800" id="wxBigTemp">–</div>
+    <div class="wxrow"><span>Durum</span><b id="wxDesc">–</b></div>
+    <div class="wxrow"><span>Rüzgar</span><b id="wxWind">–</b></div>
+    <div class="wxrow"><span>WMO kodu</span><b id="wxCode">–</b></div>
+    <div id="wxTip" class="tip"></div>
+    <button class="pill pill-teal" id="wxClose" style="margin-top:8px">Kapat</button>
+    <div style="color:var(--muted);font-size:11px;text-align:center">Umleitung Pilot</div>
+  </div>
+
+  <div id="hazModal" class="sheet-modal">
+    <div style="font-weight:800;font-size:18px">Engel Bildir</div>
+    <div style="color:var(--muted);font-size:13px">Bulunduğun GPS konumuna işaretlenir.</div>
+    <button class="hazbtn" data-h="work">&#128679; Yol Çalışması / İnşaat</button>
+    <button class="hazbtn" data-h="accident">&#9888;&#65039; Kaza / Arızalı Araç</button>
+    <button class="hazbtn" data-h="closed">&#128721; Yol Kapalı (Umleitung)</button>
+    <button class="hazbtn" data-h="radar">&#128247; Mobil Hız Radarı</button>
+    <button class="chip" id="hazCancel" style="margin-top:6px">Vazgeç</button>
+  </div>
 
   <div id="pasteModal">
     <div style="font-weight:800;font-size:15px">KML / GPX içeriğini yapıştır</div>
@@ -123,9 +198,13 @@
   <div class="handle"></div>
 
   <div class="state on" id="stEmpty">
-    <div class="hint"><b>KML</b> veya <b>GPX</b> dosyanı yükle — bulunduğun yerden başlangıca otobüs geçebilecek yollardan götürür, sonra Umleitung'u sesli anlatır.</div>
+    <div style="position:relative;margin-bottom:12px">
+      <input id="addrInput" placeholder="&#128269; Adres ara (ör. Kochstraße 11 Hannover)" style="width:100%;border:1px solid var(--line);border-radius:24px;padding:14px 18px;font:inherit;font-size:15px">
+      <div id="addrResults" style="display:none;position:absolute;top:52px;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:220px;overflow:auto;z-index:70"></div>
+    </div>
+    <div class="hint" style="font-size:12px">Adres yaz → otobüs uyumlu rota. Ya da Umleitung <b>KML/GPX</b> dosyanı yükle.</div>
     <div class="btnrow">
-      <label class="pill pill-teal" for="fileInput">&#128194; Dosya Yükle</label>
+      <label class="pill pill-teal" for="fileInput">&#128194; Dosya</label>
       <button class="chip" id="btnPaste">&#128203; Yapıştır</button>
     </div>
   </div>
@@ -133,6 +212,7 @@
   <div class="state" id="stLoaded">
     <div class="big"><span id="sumTime">–</span> <span class="km">(<span id="sumDist">–</span>)</span></div>
     <div class="subtitle" id="sumSub">Umleitung rotası</div>
+    <div id="busOk">&#10003; Otobüs uyumlu rota</div>
     <div class="btnrow" id="profileRow" style="margin-bottom:12px">
       <button class="chip pchip active" data-p="bus">&#128652; Otobüs</button>
       <button class="chip pchip" data-p="car">&#128663; Araba</button>
@@ -147,13 +227,16 @@
   </div>
 
   <div class="state" id="stNav">
-    <button class="btn-x" id="btnStop">&#10005;</button>
     <div>
       <div class="phase" id="etaPhase">Başlangıca</div>
-      <div class="eta-main" id="etaTime">–</div>
-      <div class="eta-sub"><span id="etaDist">–</span> · <span id="etaSpeed">0</span> km/h</div>
+      <div style="display:flex;gap:22px;margin-top:5px">
+        <div class="stat"><b id="etaTime">–</b><span>kalan</span></div>
+        <div class="stat"><b id="etaDist">–</b><span>mesafe</span></div>
+        <div class="stat speed"><b id="etaSpeed">0</b><span>km/h</span></div>
+      </div>
     </div>
     <div class="spacer"></div>
+    <button class="btn-x" id="btnStop">&#10005;</button>
   </div>
 
   <input type="file" id="fileInput" accept=".kml,.gpx" class="hidden">
@@ -174,6 +257,10 @@ let follow=true, lastFix=null, smoothSpeed=0, markerAnim=null;
 let offrouteSince=null, rerouting=false, lastReroute=0, simMode=false;
 let lastRaw=null, wrongWaySince=null;
 let profile='bus';
+let vehW=2.55, vehH=3.4, vehL=12, vehWeight=18;
+let hazards=[];
+let curSpeedLimit=null, overSpeedSpoken=0;
+let addrTimer=null, destAddr=null, lastSpeedQuery=0;
 const PROFILE_SPEED={bus:22,car:30,bike:15,walk:4.5}; // km/h estimates
 const PROFILE_LABEL={bus:{tr:"Otobüs rotası",de:"Busroute"},car:{tr:"Araba rotası",de:"Autoroute"},bike:{tr:"Bisiklet rotası",de:"Fahrradroute"},walk:{tr:"Yaya rotası",de:"Fußweg"}};
 const ARROW_SVG='<svg width="30" height="30" viewBox="0 0 30 30"><path d="M15 2 L26 26 L15 19.5 L4 26 Z" fill="#1a73e8" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>';
@@ -252,6 +339,12 @@ function initGL(){
   A.easeCenter=(p,z)=>m.easeTo({center:[p.lng,p.lat],zoom:z,duration:800});
   A.onGesture=cb=>{A._gestureCb=cb;};
   A.userZooming=()=>A._userZoom;
+  A._hazM=[];
+  A.setHazards=list=>{
+    A._hazM.forEach(mk=>mk.remove());A._hazM=[];
+    const ic={work:"🚧",accident:"⚠️",closed:"🛑",radar:"📷"};
+    list.forEach(h=>{A._hazM.push(new maplibregl.Marker({element:makeEl('haz-icon','<span class="haz-icon">'+ic[h.type]+'</span>'),anchor:'center'}).setLngLat([h.lng,h.lat]).addTo(m));});
+  };
   return A;
 }
 
@@ -306,6 +399,12 @@ function initLF(){
   A.easeCenter=(p,z)=>prog(()=>m.setView([p.lat,p.lng],z,{animate:true}),800);
   A.onGesture=cb=>{A._gestureCb=cb;};
   A.userZooming=()=>A._userZoom;
+  A._hazM=[];
+  A.setHazards=list=>{
+    A._hazM.forEach(mk=>m.removeLayer(mk));A._hazM=[];
+    const ic={work:"🚧",accident:"⚠️",closed:"🛑",radar:"📷"};
+    list.forEach(h=>{A._hazM.push(L.marker([h.lat,h.lng],{icon:L.divIcon({className:'',html:'<span class="haz-icon">'+ic[h.type]+'</span>',iconSize:null,iconAnchor:[11,11]})}).addTo(m));});
+  };
   return A;
 }
 
@@ -392,11 +491,13 @@ const PHRASES={
   tr:{far:(m,d)=>`${m} metre sonra ${d==="R"?"sağa":"sola"} dönün`,now:d=>`Şimdi ${d==="R"?"sağa":"sola"} dönün`,sharp:d=>`keskin ${d==="R"?"sağ":"sol"}`,
     start:"Navigasyon başladı. Rotayı takip edin.",offroute:"Rotadan çıktınız",back:"Rotaya döndünüz",
     arrive:"Hedefe ulaştınız. Rota tamamlandı.",approach:"Önce Umleitung başlangıcına yönlendiriliyorsunuz",
-    onroute:"Umleitung rotasına girdiniz",reroute:"Yeni rota hesaplanıyor",turnR:"Sağa dön",turnL:"Sola dön",toStart:"Başlangıca",toEnd:"Hedefe"},
+    onroute:"Umleitung rotasına girdiniz",reroute:"Yeni rota hesaplanıyor",turnR:"Sağa dön",turnL:"Sola dön",toStart:"Başlangıca",toEnd:"Hedefe",
+    hazWork:"Dikkat, ileride yol çalışması var",hazAccident:"Dikkat, ileride kaza var",hazClosed:"Dikkat, ileride yol kapalı",hazRadar:"Dikkat, ileride hız radarı var",overspeed:"Hız sınırını aştınız"},
   de:{far:(m,d)=>`In ${m} Metern ${d==="R"?"rechts":"links"} abbiegen`,now:d=>`Jetzt ${d==="R"?"rechts":"links"} abbiegen`,sharp:d=>`scharf ${d==="R"?"rechts":"links"}`,
     start:"Navigation gestartet. Folgen Sie der Route.",offroute:"Sie haben die Route verlassen",back:"Zurück auf der Route",
     arrive:"Sie haben Ihr Ziel erreicht.",approach:"Sie werden zuerst zum Beginn der Umleitung geführt",
-    onroute:"Sie sind jetzt auf der Umleitungsroute",reroute:"Route wird neu berechnet",turnR:"Rechts abbiegen",turnL:"Links abbiegen",toStart:"Zum Start",toEnd:"Zum Ziel"}
+    onroute:"Sie sind jetzt auf der Umleitungsroute",reroute:"Route wird neu berechnet",turnR:"Rechts abbiegen",turnL:"Links abbiegen",toStart:"Zum Start",toEnd:"Zum Ziel",
+    hazWork:"Achtung, Baustelle voraus",hazAccident:"Achtung, Unfall voraus",hazClosed:"Achtung, Straße gesperrt",hazRadar:"Achtung, Radarkontrolle voraus",overspeed:"Sie überschreiten das Tempolimit"}
 };
 const P=()=>PHRASES[voiceLang];
 function speak(text){
@@ -432,6 +533,9 @@ function displayRoute(r){
     $("sumTime").textContent="≈ "+est;
     $("sumDist").textContent=fmtDist(r.total);
     $("sumSub").textContent=PROFILE_LABEL[profile][voiceLang]+" · "+r.turns.length+(voiceLang==="tr"?" dönüş":" Abbiegungen");
+    const bo=$("busOk");
+    if(profile==="bus"){bo.style.display="block";bo.innerHTML="&#10003; "+(voiceLang==="tr"?`Otobüs uyumlu rota · ${String(vehW).replace(".",",")} m dikkate alındı`:`Busgeeignete Route · ${String(vehW).replace(".",",")} m berücksichtigt`);}
+    else bo.style.display="none";
     if(!navActive)setSheet("stLoaded");
   });
 }
@@ -460,6 +564,7 @@ function updateETA(proj){
   const rem=Math.max(0,target-proj.s);
   const spd=Math.max(smoothSpeed,PROFILE_SPEED[profile]/3.6);
   $("etaPhase").textContent=inApproach?P().toStart:P().toEnd;
+  $("hudSub").textContent=inApproach?(voiceLang==="tr"?"BAŞLANGICA":"ZUM START"):"UMLEITUNG";
   $("etaTime").textContent=fmtTime(rem/spd/60);
   $("etaDist").textContent=fmtDist(rem);
   $("etaSpeed").textContent=Math.round(smoothSpeed*3.6);
@@ -503,9 +608,12 @@ function onPosition(lat,lng,speedMs,gpsHeading,acc){
   if(prev)moveMarkerSmooth(prev,fix,heading);else MAP.posSet(fix,heading);
   if(follow&&!MAP.userZooming())MAP.camera(fix,heading,900);
   lastFix=fix;
+  updateSpeedUI(speedMs);
+  updateSpeedLimit(lat,lng);
 
   if(!onMainSpoken&&proj.s>=(route.approachS||0)){onMainSpoken=true;speak(P().onroute);}
   updateETA(proj);
+  checkHazardsAhead(proj);
 
   const nav=$("stNav");
   if(proj.d>60){
@@ -594,7 +702,7 @@ async function fetchApproach(from,to){
   try{
     const body={locations:[{lat:from.lat,lon:from.lng},{lat:to.lat,lon:to.lng}],
       costing:costing,
-      costing_options:profile==="bus"?{bus:{width:2.55,height:3.4,length:12.0}}:{},
+      costing_options:profile==="bus"?{bus:{width:vehW,height:vehH,length:vehL,weight:vehWeight}}:{},
       directions_options:{units:"kilometers"}};
     const res=await fetch("https://valhalla1.openstreetmap.de/route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     if(!res.ok)throw new Error("Valhalla "+res.status);
@@ -634,7 +742,7 @@ async function startNav(simulate=false){
     const start=baseRoute.pts[0];
     route=baseRoute;route.approachIdx=0;route.approachS=0;
     if(haversine(here,start)>120){
-      toast(profile==="bus"?"Otobüs rotası hesaplanıyor (2,55 m genişlik)…":PROFILE_LABEL[profile][voiceLang]+" hesaplanıyor…");
+      toast(profile==="bus"?`Otobüs rotası hesaplanıyor (${String(vehW).replace(".",",")} m genişlik)…`:PROFILE_LABEL[profile][voiceLang]+" hesaplanıyor…");
       try{
         const appr=await fetchApproach(here,start);
         route=buildCombined(appr.pts,baseRoute);
@@ -650,6 +758,9 @@ async function startNav(simulate=false){
   displayRoute(route);
   MAP.setChip(null);
   $("recenter").classList.remove("show");
+  $("speedbox").classList.add("on");
+  $("btnHazard").classList.add("on");
+  overSpeedSpoken=0;curSpeedLimit=null;$("speedlimit").classList.remove("on","over");
   setSheet("stNav");
   MAP.setZoom(18);
   speak(route.approachS>0?P().approach:P().start);
@@ -677,6 +788,9 @@ function stopNav(finished=false){
   if(markerAnim)cancelAnimationFrame(markerAnim);
   try{wakeLock?.release();}catch(e){}wakeLock=null;
   $("hud").classList.remove("on");
+  $("hazbar").classList.remove("on");
+  $("speedbox").classList.remove("on");
+  $("btnHazard").classList.remove("on");
   $("recenter").classList.remove("show");
   $("stNav").classList.remove("offroute");
   if(MAP){MAP.posRemove();MAP.resetBearing();}
@@ -705,6 +819,17 @@ $("fileInput").onchange=e=>{
 $("btnGo").onclick=()=>startNav(false);
 $("btnSim").onclick=()=>startNav(true);
 $("btnStop").onclick=()=>stopNav();
+$("btnSettings").onclick=()=>{$("setW").value=vehW;$("setH").value=vehH;$("setL").value=vehL;$("setWt").value=vehWeight;$("settingsModal").style.display="flex";};
+$("setOk").onclick=()=>{
+  const w=parseFloat($("setW").value),h=parseFloat($("setH").value),l=parseFloat($("setL").value);
+  if(isFinite(w)&&w>=1.5&&w<=3)vehW=w;
+  if(isFinite(h)&&h>=2&&h<=4.5)vehH=h;
+  if(isFinite(l)&&l>=6&&l<=25)vehL=l;
+  const wt=parseFloat($("setWt").value);if(isFinite(wt)&&wt>=3&&wt<=30)vehWeight=wt;
+  $("settingsModal").style.display="none";
+  toast(`Araç profili: ${String(vehW).replace(".",",")} m × ${String(vehH).replace(".",",")} m × ${String(vehL).replace(".",",")} m ✓`);
+  if(baseRoute)displayRoute(route);
+};
 $("btnPaste").onclick=()=>{$("pasteModal").style.display="flex";$("pasteArea").focus();};
 $("pasteCancel").onclick=()=>{$("pasteModal").style.display="none";};
 $("pasteOk").onclick=()=>{
@@ -732,6 +857,148 @@ document.querySelectorAll(".pchip").forEach(b=>{
 $("langTR").onclick=()=>{voiceLang="tr";$("langTR").classList.add("active");$("langDE").classList.remove("active");if(baseRoute)displayRoute(route);};
 $("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("langTR").classList.remove("active");if(baseRoute)displayRoute(route);};
 
+/* ═══════════ HAVA DURUMU (Open-Meteo) ═══════════ */
+const WMO={0:["Açık",0x2600],1:["Az bulutlu",0x1F324],2:["Parçalı bulutlu",0x26C5],3:["Kapalı",0x2601],
+45:["Sisli",0x1F32B],48:["Kırağılı sis",0x1F32B],51:["Çisenti",0x1F327],53:["Çisenti",0x1F327],55:["Yoğun çisenti",0x1F327],
+61:["Hafif yağmur",0x1F327],63:["Yağmur",0x1F327],65:["Şiddetli yağmur",0x26C8],66:["Dondurucu yağmur",0x1F327],67:["Dondurucu yağmur",0x1F327],
+71:["Hafif kar",0x1F328],73:["Kar",0x1F328],75:["Yoğun kar",0x2744],77:["Kar taneleri",0x2744],
+80:["Sağanak",0x1F326],81:["Sağanak",0x1F326],82:["Şiddetli sağanak",0x26C8],85:["Kar sağanağı",0x1F328],86:["Kar sağanağı",0x1F328],
+95:["Gök gürültülü",0x26C8],96:["Dolulu fırtına",0x26C8],99:["Şiddetli fırtına",0x26C8]};
+let lastWx=null;
+async function loadWeather(lat,lng){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,wind_speed_10m`);
+    const d=await r.json();const c=d.current;
+    lastWx={temp:Math.round(c.temperature_2m),code:c.weather_code,wind:Math.round(c.wind_speed_10m)};
+    const ic=(WMO[c.weather_code]||["–",0x2600])[1];
+    $("wxtemp").textContent=lastWx.temp+"°C";
+    $("wxpill").firstChild.textContent=String.fromCodePoint(ic)+" ";
+    $("wxpill").classList.add("on");
+  }catch(e){}
+}
+function wxTip(code,wind){
+  const rain=[51,53,55,61,63,65,66,67,80,81,82].includes(code);
+  const snow=[71,73,75,77,85,86].includes(code);
+  const fog=[45,48].includes(code);
+  const storm=[95,96,99].includes(code);
+  if(snow)return "❄️ Karlı hava: retarder frenini dikkatli kullan, gizli buzlanmaya karşı fren mesafeni artır, ani direksiyon hareketinden kaçın.";
+  if(rain)return "🌧️ Islak asfalt: fren mesafesi uzar, takip mesafeni artır, durak yaklaşımında erken yavaşla.";
+  if(fog)return "🌫️ Sis: sis farlarını aç, hızını düşür, durak ve yaya geçitlerine dikkat.";
+  if(storm)return "⛈️ Fırtına: yan rüzgara ve düşen dallara dikkat, direksiyonu sıkı tut.";
+  if(wind>=40)return "💨 Kuvvetli rüzgar: yüksek yan yüzey savrulabilir, köprü ve açık alanlarda dikkatli ol.";
+  return "✅ Sürüş şartları normal. Yine de takip mesafeni koru.";
+}
+$("wxpill").onclick=()=>{
+  if(!lastWx)return;
+  const wm=WMO[lastWx.code]||["–",0x2600];
+  $("wxBigIcon").textContent=String.fromCodePoint(wm[1]);
+  $("wxBigTemp").textContent=lastWx.temp+"°C";
+  $("wxDesc").textContent=wm[0];
+  $("wxWind").textContent=lastWx.wind+" km/h";
+  $("wxCode").textContent=lastWx.code;
+  $("wxTip").textContent=wxTip(lastWx.code,lastWx.wind);
+  $("wxModal").style.display="flex";
+};
+$("wxClose").onclick=()=>{$("wxModal").style.display="none";};
+
+/* ═══════════ ADRES ARAMA (Nominatim) ═══════════ */
+$("addrInput").oninput=e=>{
+  const q=e.target.value.trim();
+  clearTimeout(addrTimer);
+  if(q.length<3){$("addrResults").style.display="none";return;}
+  addrTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=de`,{headers:{"Accept-Language":"de"}});
+      const list=await r.json();
+      const box=$("addrResults");
+      if(!list.length){box.style.display="none";return;}
+      box.innerHTML="";
+      list.forEach(it=>{
+        const div=document.createElement("div");
+        div.style.cssText="padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer";
+        div.textContent=it.display_name;
+        div.onclick=()=>selectAddress(+it.lat,+it.lon,it.display_name.split(",")[0]);
+        box.appendChild(div);
+      });
+      box.style.display="block";
+    }catch(e){toast("Adres araması başarısız",4000);}
+  },1100);
+};
+async function selectAddress(lat,lng,name){
+  $("addrResults").style.display="none";
+  $("addrInput").value=name;
+  destAddr={lat,lng,name};
+  let here;
+  try{here=await getPositionOnce();}catch(e){toast("Konum alınamadı: "+e.message,6000);return;}
+  toast(profile==="bus"?"Otobüs uyumlu rota hesaplanıyor…":"Rota hesaplanıyor…");
+  try{
+    const appr=await fetchApproach(here,{lat,lng});
+    const r={name:name,pts:appr.pts};
+    analyzeRoute(r);r.approachIdx=0;r.approachS=0;
+    baseRoute=r;route=r;
+    displayRoute(r);
+    if(appr.profile==="fallback"&&profile==="bus")toast("Uyarı: otobüs profili ulaşılamadı, standart rota.",6000);
+  }catch(e){toast("Rota alınamadı: "+e.message,6000);}
+}
+
+/* ═══════════ ENGELLER ═══════════ */
+function hazMeta(type){
+  return {work:["🚧",P().hazWork],accident:["⚠️",P().hazAccident],closed:["🛑",P().hazClosed],radar:["📷",P().hazRadar]}[type];
+}
+function renderHazards(){ if(MAP&&MAP.setHazards)MAP.setHazards(hazards); }
+$("btnHazard").onclick=()=>{$("hazModal").style.display="flex";};
+$("hazCancel").onclick=()=>{$("hazModal").style.display="none";};
+document.querySelectorAll(".hazbtn").forEach(b=>{
+  b.onclick=async()=>{
+    let here=lastFix;
+    if(!here){try{here=await getPositionOnce();}catch(e){toast("Konum yok",4000);return;}}
+    hazards.push({lat:here.lat,lng:here.lng,type:b.dataset.h,announced:false});
+    renderHazards();
+    $("hazModal").style.display="none";
+    toast(hazMeta(b.dataset.h)[0]+" Engel işaretlendi ✓");
+  };
+});
+function checkHazardsAhead(proj){
+  if(!navActive||!route)return;
+  let nearest=null,nd=Infinity;
+  for(const h of hazards){
+    const hp=projectOnRoute(h);
+    if(hp.d>100)continue;
+    const ahead=hp.s-proj.s;
+    if(ahead>0&&ahead<400&&ahead<nd){nd=ahead;nearest=h;}
+  }
+  const bar=$("hazbar");
+  if(nearest){
+    const meta=hazMeta(nearest.type);
+    $("hazbarIcon").textContent=meta[0];
+    $("hazbarText").textContent=`${Math.round(nd/10)*10}m sonra: ${meta[1].replace("Dikkat, ileride ","").replace("Achtung, ","")}`;
+    bar.classList.add("on");
+    if(!nearest.announced&&nd<380){nearest.announced=true;speak(meta[1]);}
+  }else bar.classList.remove("on");
+}
+
+/* ═══════════ HIZ LİMİTİ (Overpass) ═══════════ */
+async function updateSpeedLimit(lat,lng){
+  if(Date.now()-lastSpeedQuery<12000)return;
+  lastSpeedQuery=Date.now();
+  try{
+    const q=`[out:json][timeout:8];way(around:25,${lat},${lng})[highway][maxspeed];out tags 1;`;
+    const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:q});
+    const d=await r.json();
+    const el=(d.elements||[]).find(e=>e.tags&&e.tags.maxspeed);
+    if(el){const mm=parseInt(el.tags.maxspeed);if(isFinite(mm)){curSpeedLimit=mm;$("speedlimit").textContent=mm;$("speedlimit").classList.add("on");}}
+  }catch(e){}
+}
+function updateSpeedUI(speedMs){
+  const kmh=speedMs!=null&&isFinite(speedMs)?Math.round(speedMs*3.6):0;
+  $("curspeedVal").textContent=kmh;
+  const sl=$("speedlimit");
+  if(curSpeedLimit&&kmh>curSpeedLimit+3){
+    sl.classList.add("over");
+    if(Date.now()-overSpeedSpoken>15000){overSpeedSpoken=Date.now();speak(P().overspeed);}
+  }else sl.classList.remove("over");
+}
+
 /* First launch: permission + blue dot */
 (function initLocation(){
   if(!navigator.geolocation||!MAP)return;
@@ -740,6 +1007,7 @@ $("langDE").onclick=()=>{voiceLang="de";$("langDE").classList.add("active");$("l
       const fix={lat:p.coords.latitude,lng:p.coords.longitude};
       if(!baseRoute)MAP.easeCenter(fix,15);
       MAP.ready(()=>{MAP.posEnsure('dot',fix);MAP.posSet(fix,null);});
+      loadWeather(fix.lat,fix.lng);
       toast("Konum izni verildi ✓");
     },
     err=>{if(err.code===1)toast("Konum izni verilmedi. Chrome'da adres çubuğundaki kilit simgesinden izin verebilirsin.",6000);},
