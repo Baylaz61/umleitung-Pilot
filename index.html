@@ -905,26 +905,62 @@ $("wxpill").onclick=()=>{
 $("wxClose").onclick=()=>{$("wxModal").style.display="none";};
 
 /* ═══════════ ADRES ARAMA (Nominatim) ═══════════ */
+/* Durakları Overpass'tan ara — GPS konumun etrafında ~30 km, isme göre */
+async function searchStops(q){
+  const c=lastFix||{lat:52.37,lng:9.73}; // yoksa Hannover merkez
+  const esc=q.replace(/["\\]/g,"");
+  const query=`[out:json][timeout:15];
+    (node(around:30000,${c.lat},${c.lng})["public_transport"="platform"]["name"~"${esc}",i];
+     node(around:30000,${c.lat},${c.lng})["highway"="bus_stop"]["name"~"${esc}",i];
+     node(around:30000,${c.lat},${c.lng})["railway"="tram_stop"]["name"~"${esc}",i];
+    );out center 8;`;
+  try{
+    const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query});
+    const d=await r.json();
+    const seen=new Set(),out=[];
+    (d.elements||[]).forEach(el=>{
+      const name=el.tags&&el.tags.name;if(!name)return;
+      const lat=el.lat||(el.center&&el.center.lat),lng=el.lon||(el.center&&el.center.lon);
+      if(lat==null)return;
+      const key=name+"|"+lat.toFixed(4);
+      if(seen.has(key))return;seen.add(key);
+      const tram=el.tags.railway==="tram_stop"||el.tags.tram==="yes";
+      out.push({lat,lng,name,icon:tram?"🚋":"🚌"});
+    });
+    return out.slice(0,6);
+  }catch(e){return [];}
+}
 $("addrInput").oninput=e=>{
   const q=e.target.value.trim();
   clearTimeout(addrTimer);
   if(q.length<3){$("addrResults").style.display="none";return;}
   addrTimer=setTimeout(async()=>{
-    try{
-      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=de`,{headers:{"Accept-Language":"de"}});
-      const list=await r.json();
-      const box=$("addrResults");
-      if(!list.length){box.style.display="none";return;}
-      box.innerHTML="";
-      list.forEach(it=>{
-        const div=document.createElement("div");
-        div.style.cssText="padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer";
-        div.textContent=it.display_name;
-        div.onclick=()=>selectAddress(+it.lat,+it.lon,it.display_name.split(",")[0]);
-        box.appendChild(div);
-      });
-      box.style.display="block";
-    }catch(e){toast("Adres araması başarısız",4000);}
+    const box=$("addrResults");
+    box.innerHTML='<div style="padding:11px 14px;font-size:12px;color:var(--muted)">Aranıyor…</div>';
+    box.style.display="block";
+    /* Durak (Overpass) + adres (Nominatim) paralel */
+    const [stops,addrs]=await Promise.all([
+      searchStops(q),
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=de`,{headers:{"Accept-Language":"de"}})
+        .then(r=>r.json()).catch(()=>[])
+    ]);
+    box.innerHTML="";
+    const row=(icon,title,sub,lat,lng,name)=>{
+      const div=document.createElement("div");
+      div.style.cssText="padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;display:flex;gap:10px;align-items:center";
+      div.innerHTML=`<span style="font-size:18px">${icon}</span><span><b>${title}</b>${sub?`<br><span style="font-size:11px;color:var(--muted)">${sub}</span>`:""}</span>`;
+      div.onclick=()=>selectAddress(lat,lng,name);
+      box.appendChild(div);
+    };
+    /* Duraklar önce (yeşil ayraçla) */
+    stops.forEach(st=>row(st.icon,st.name,"Durak / Haltestelle",st.lat,st.lng,st.name));
+    if(stops.length&&addrs.length){
+      const sep=document.createElement("div");
+      sep.style.cssText="padding:5px 14px;font-size:10px;font-weight:700;color:var(--muted);background:#f2f3f5;text-transform:uppercase;letter-spacing:.05em";
+      sep.textContent="Adresler";box.appendChild(sep);
+    }
+    addrs.forEach(it=>row("📍",it.display_name.split(",")[0],it.display_name.split(",").slice(1,3).join(",").trim(),+it.lat,+it.lon,it.display_name.split(",")[0]));
+    if(!stops.length&&!addrs.length){box.innerHTML='<div style="padding:11px 14px;font-size:12px;color:var(--muted)">Sonuç bulunamadı</div>';}
   },1100);
 };
 async function selectAddress(lat,lng,name){
